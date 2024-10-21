@@ -52,7 +52,10 @@ fun AppNavHost() {
                 ConversationDetailScreen(navController, conversationTitle)
             }
             composable("post") {
-                PostScreen()
+                PostScreen { activityData ->
+                    println("Activité créée : $activityData")
+                    navController.popBackStack()
+                }
             }
             composable("profile") {
                 ProfileScreen(
