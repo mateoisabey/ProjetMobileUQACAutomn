@@ -17,6 +17,7 @@ fun ProfileScreen(onEditProfile: () -> Unit) {
     var userAge by remember { mutableStateOf("") }
     var sports by remember { mutableStateOf(listOf<String>()) }
     var loading by remember { mutableStateOf(true) }
+    var isEditing by remember { mutableStateOf(false) }
 
     val db = FirebaseFirestore.getInstance()
     val currentUser = FirebaseAuth.getInstance().currentUser
@@ -59,30 +60,89 @@ fun ProfileScreen(onEditProfile: () -> Unit) {
             Text(text = "Mon Profil", style = MaterialTheme.typography.titleSmall)
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text(text = "Nom : $userName", style = MaterialTheme.typography.bodyLarge)
-            Spacer(modifier = Modifier.height(8.dp))
+            if (isEditing) {
+                TextField(
+                    value = userName,
+                    onValueChange = { userName = it },
+                    label = { Text("Nom") }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Text(text = "Sports pratiqués :", style = MaterialTheme.typography.bodyLarge)
-            if (sports.isNotEmpty()) {
-                sports.forEach { sport ->
-                    Text(text = sport, style = MaterialTheme.typography.bodySmall)
+                TextField(
+                    value = userAge,
+                    onValueChange = { userAge = it },
+                    label = { Text("Age") }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextField(
+                    value = userGender,
+                    onValueChange = { userGender = it },
+                    label = { Text("Sexe") }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextField(
+                    value = userCity,
+                    onValueChange = { userCity = it },
+                    label = { Text("Ville") }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextField(
+                    value = sports.joinToString(", "),
+                    onValueChange = { sports = it.split(",").map { sport -> sport.trim() } },
+                    label = { Text("Sports pratiqués") }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(onClick = {
+                    currentUser?.let { user ->
+                        val updatedData = hashMapOf(
+                            "name" to userName,
+                            "age" to userAge,
+                            "gender" to userGender,
+                            "city" to userCity,
+                            "sports" to sports
+                        )
+                        db.collection("userData").document(user.uid).set(updatedData)
+                            .addOnSuccessListener {
+                                isEditing = false
+                                // Afficher un message de succès si besoin
+                            }
+                            .addOnFailureListener {
+                                // Gérer l'erreur ici si besoin
+                            }
+                    }
+                }) {
+                    Text(text = "Enregistrer")
                 }
             } else {
-                Text(text = "Aucun sport enregistré", style = MaterialTheme.typography.bodySmall)
-            }
-            Spacer(modifier = Modifier.height(16.dp))
+                Text(text = "Nom : $userName", style = MaterialTheme.typography.bodyLarge)
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Text(text = "Age : $userAge", style = MaterialTheme.typography.bodyLarge)
-            Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "Sports pratiqués :", style = MaterialTheme.typography.bodyLarge)
+                if (sports.isNotEmpty()) {
+                    sports.forEach { sport ->
+                        Text(text = sport, style = MaterialTheme.typography.bodySmall)
+                    }
+                } else {
+                    Text(text = "Aucun sport enregistré", style = MaterialTheme.typography.bodySmall)
+                }
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Text(text = "Sexe : $userGender", style = MaterialTheme.typography.bodyLarge)
-            Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "Age : $userAge", style = MaterialTheme.typography.bodyLarge)
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Text(text = "Ville : $userCity", style = MaterialTheme.typography.bodyLarge)
-            Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "Sexe : $userGender", style = MaterialTheme.typography.bodyLarge)
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Button(onClick = onEditProfile) {
-                Text(text = "Modifier le profil")
+                Text(text = "Ville : $userCity", style = MaterialTheme.typography.bodyLarge)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(onClick = { isEditing = true }) {
+                    Text(text = "Modifier le profil")
+                }
             }
         }
     }
