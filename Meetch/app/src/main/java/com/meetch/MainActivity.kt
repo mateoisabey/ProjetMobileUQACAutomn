@@ -3,31 +3,36 @@ package com.meetch
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.*
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.meetch.auth.FirebaseAuthManager
 import com.meetch.ui.AppNavHost
-import com.meetch.ui.screen.SplashScreen
-import com.meetch.ui.theme.MeetchTheme
-import kotlinx.coroutines.delay
+import com.meetch.ui.screen.LoginScreen
+import com.meetch.ui.screen.SignUpScreen
 
 class MainActivity : ComponentActivity() {
+
+    private val authManager = FirebaseAuthManager()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MeetchTheme {
-                val navController = rememberNavController()
-                LaunchedEffect(Unit) {
-                    delay(2000)
-                    navController.navigate("main_screen") {
-                        popUpTo("splash_screen") { inclusive = true }
+            val navController = rememberNavController()
+            NavHost(navController = navController, startDestination = "login") {
+                composable("login") {
+                    LoginScreen(authManager, navController) {
+                        navController.navigate("main_screen")
                     }
                 }
-
-                NavHost(navController = navController, startDestination = "splash_screen") {
-                    composable("splash_screen") { SplashScreen() }
-                    composable("main_screen") { AppNavHost() }
+                composable("sign_up") {
+                    SignUpScreen(authManager) {
+                        navController.navigate("main_screen")
+                    }
+                }
+                composable("main_screen") {
+                    AppNavHost()
                 }
             }
         }

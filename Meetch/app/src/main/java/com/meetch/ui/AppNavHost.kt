@@ -24,12 +24,14 @@ import com.meetch.ui.screen.PostScreen
 import com.meetch.ui.screen.ProfileScreen
 import com.meetch.ui.screen.SwipeScreen
 
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
+
 @Composable
 fun AppNavHost() {
     val navController: NavHostController = rememberNavController()
     var selectedItem by remember { mutableStateOf(0) }
-
-    val items = listOf("swipe", "chat", "profile")
+    val currentUser: FirebaseUser? = FirebaseAuth.getInstance().currentUser
 
     Scaffold(
         bottomBar = {
@@ -59,15 +61,12 @@ fun AppNavHost() {
             }
             composable("profile") {
                 ProfileScreen(
-                    userName = "John Doe",
-                    sports = listOf("Tennis", "Basketball"),
-                    onEditProfile = { /* TODO: Handle profile edit */ }
+                    onEditProfile = { }
                 )
             }
         }
     }
 }
-
 @Composable
 fun BottomNavigationBar(
     navController: NavHostController,
