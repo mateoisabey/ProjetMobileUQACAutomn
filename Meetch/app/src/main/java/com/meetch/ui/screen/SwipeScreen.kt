@@ -2,6 +2,8 @@ package com.meetch.ui.screen
 
 import android.annotation.SuppressLint
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,23 +11,29 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
+import com.meetch.R
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
+import com.meetch.ui.data.ActivityCard
 
 @SuppressLint("UnrememberedMutableState")
 @Composable
 fun SwipeScreen() {
     val activities = listOf(
-        "Basketball à 16h",
-        "Football ce soir",
-        "Tennis demain",
-        "Cours de yoga à 18h"
+        ActivityCard("Basketball", "Match de basketball", "16h", R.drawable.basket),
+        ActivityCard("Football", "Session de football", "Ce soir", R.drawable.football),
+        ActivityCard("Tennis", "Entraînement de tennis", "Demain", R.drawable.tennis),
+        ActivityCard("Yoga", "Cours de yoga", "18h", R.drawable.yoga)
     )
+
     var currentIndex by remember { mutableStateOf(0) }
     var offsetX by remember { mutableStateOf(0f) }
     var isSwiping by remember { mutableStateOf(false) }
@@ -36,12 +44,12 @@ fun SwipeScreen() {
         targetValue = offsetX,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         finishedListener = {
-            isAnimationCompleted = true
-            // Le changement de carte se fait maintenant seulement après que l'animation est totalement terminée
+            // Mettez à jour currentIndex immédiatement après que l'animation se termine
             if (offsetX > 600f || offsetX < -600f) {
-                currentIndex++
-                offsetX = 0f // Réinitialiser après le swipe complet
+                currentIndex = (currentIndex + 1).coerceAtMost(activities.size - 1)
             }
+            offsetX = 0f
+            isAnimationCompleted = true
             isSwiping = false
         }
     )
@@ -58,35 +66,43 @@ fun SwipeScreen() {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFDFDFD)),
+        contentAlignment = Alignment.Center
+    ) {
+        // Ajout du logo au-dessus des cartes
+        Image(
+            painter = painterResource(id = R.drawable.logo),
+            contentDescription = null,
+            modifier = Modifier
+                .size(100.dp)
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp)
+        )
+
         if (currentIndex < activities.size) {
-            if (currentIndex + 1 < activities.size) {
-                Card(
+            if (currentIndex + 1 < activities.size && isAnimationCompleted) {
+                ActivityCardView(
+                    activity = activities[currentIndex + 1],
                     modifier = Modifier
-                        .fillMaxWidth(0.75f)
-                        .aspectRatio(1f)
+                        .fillMaxWidth(0.85f)
+                        .aspectRatio(0.9f)
                         .padding(16.dp)
                         .graphicsLayer {
-                            alpha = (offsetX.absoluteValue / 600f).coerceIn(0f, 1f)
-                        },
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                ) {
-                    Text(
-                        text = activities[currentIndex + 1],
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                }
+                            // Suppression de l'effet d'animation dans la direction opposée
+                            alpha = 1f // Montre la carte suivante sans animation
+                        }
+                )
             }
 
-            Card(
+            // Carte principale avec taille augmentée
+            ActivityCardView(
+                activity = activities[currentIndex],
                 modifier = Modifier
-                    .fillMaxWidth(0.75f)
-                    .aspectRatio(1f)
+                    .fillMaxWidth(0.85f)
+                    .aspectRatio(0.9f)
                     .offset {
                         IntOffset(
                             x = when {
@@ -111,7 +127,7 @@ fun SwipeScreen() {
                             },
                             onDragEnd = {
                                 if (offsetX > 600f || offsetX < -600f) {
-                                    // Laisser l'animation de sortie se dérouler
+                                    // Fin d'animation gérée dans `finishedListener`
                                 } else {
                                     offsetX = 0f
                                 }
@@ -123,23 +139,12 @@ fun SwipeScreen() {
                                 }
                             }
                         )
-                    },
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-            ) {
-                Text(
-                    text = activities[currentIndex],
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-            }
+                    }
+            )
         } else {
             Text(
                 text = "Aucune autre activité disponible",
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF0C1A27)),
                 modifier = Modifier.padding(16.dp)
             )
         }
@@ -157,17 +162,65 @@ fun SwipeScreen() {
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Button(
-                        onClick = { onButtonClick(-700f) }
+                        onClick = { onButtonClick(-700f) }, // Ignorer
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFC6302))
                     ) {
-                        Text(text = "Ignorer")
+                        Text(text = "Ignorer", color = Color(0xFFFDFDFD))
                     }
                     Button(
-                        onClick = { onButtonClick(700f) }
+                        onClick = { onButtonClick(700f) }, // Participer
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFC6302))
                     ) {
-                        Text(text = "Participer")
+                        Text(text = "Participer", color = Color(0xFFFDFDFD))
                     }
                 }
             }
+        }
+    }
+}
+
+// Fonction pour afficher la vue d'une carte d'activité
+@Composable
+fun ActivityCardView(activity: ActivityCard, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0C1A27))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Affichage de l'image
+            Image(
+                painter = painterResource(id = activity.imageResId),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+                    .padding(bottom = 8.dp)
+            )
+
+            Text(
+                text = activity.title,
+                style = MaterialTheme.typography.titleMedium.copy(color = Color(0xFFFDFDFD)),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = activity.description,
+                style = MaterialTheme.typography.bodyMedium.copy(color = Color(0xFFFDFDFD)),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = activity.time,
+                style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFFDFDFD)),
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
