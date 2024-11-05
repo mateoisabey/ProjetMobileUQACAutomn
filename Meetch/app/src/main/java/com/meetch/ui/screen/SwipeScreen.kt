@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
@@ -20,17 +21,29 @@ import kotlin.math.roundToInt
 @SuppressLint("UnrememberedMutableState")
 @Composable
 fun SwipeScreen() {
-    val activities = listOf(
-        "Basketball à 16h",
-        "Football ce soir",
-        "Tennis demain",
-        "Cours de yoga à 18h"
-    )
+    var activities by remember { mutableStateOf(listOf<String>()) }
     var currentIndex by remember { mutableStateOf(0) }
     var offsetX by remember { mutableStateOf(0f) }
     var isSwiping by remember { mutableStateOf(false) }
     var isAnimationCompleted by remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
+
+    // Firebase Firestore instance
+    val db = FirebaseFirestore.getInstance()
+
+    // Récupérer les activités depuis Firestore
+    LaunchedEffect(Unit) {
+        db.collection("activities")
+            .get()
+            .addOnSuccessListener { result ->
+                activities = result.documents.mapNotNull { document ->
+                    document.getString("name")
+                }
+            }
+            .addOnFailureListener { exception ->
+                println("Erreur lors de la récupération des activités : ${exception.message}")
+            }
+    }
 
     val animatedOffsetX by animateFloatAsState(
         targetValue = offsetX,
