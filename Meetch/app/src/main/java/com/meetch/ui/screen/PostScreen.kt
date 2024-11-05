@@ -12,6 +12,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
@@ -23,15 +25,12 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
     val activityLocation = remember { mutableStateOf(TextFieldValue("")) }
     val activityDescription = remember { mutableStateOf(TextFieldValue("")) }
 
-    val steps = listOf(
-        "Nom de l'activité" to activityName,
-        "Date de l'activité (JJ/MM/AAAA)" to activityDate,
-        "Lieu de l'activité" to activityLocation,
-        "Description de l'activité" to activityDescription
-    )
+    // Firebase instances
+    val db = FirebaseFirestore.getInstance()
+    val currentUser = FirebaseAuth.getInstance().currentUser
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        if (currentStep < steps.size) {
+        if (currentStep < 4) {  // Le 4 correspond à l'indice de la description dans les étapes
             Card(
                 modifier = Modifier
                     .fillMaxWidth(0.75f)
@@ -46,29 +45,57 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = steps[currentStep].first,
+                        text = when (currentStep) {
+                            0 -> "Nom de l'activité"
+                            1 -> "Date de l'activité (JJ/MM/AAAA)"
+                            2 -> "Lieu de l'activité"
+                            3 -> "Description de l'activité"
+                            else -> ""
+                        },
                         style = MaterialTheme.typography.titleSmall,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
                     OutlinedTextField(
-                        value = steps[currentStep].second.value,
-                        onValueChange = { steps[currentStep].second.value = it },
-                        label = { Text(steps[currentStep].first) },
+                        value = when (currentStep) {
+                            0 -> activityName.value
+                            1 -> activityDate.value
+                            2 -> activityLocation.value
+                            3 -> activityDescription.value
+                            else -> TextFieldValue("")
+                        },
+                        onValueChange = { textFieldValue ->
+                            when (currentStep) {
+                                0 -> activityName.value = textFieldValue
+                                1 -> activityDate.value = textFieldValue
+                                2 -> activityLocation.value = textFieldValue
+                                3 -> activityDescription.value = textFieldValue
+                            }
+                        },
+                        label = { Text(when (currentStep) {
+                            0 -> "Nom"
+                            1 -> "Date"
+                            2 -> "Lieu"
+                            3 -> "Description"
+                            else -> ""
+                        }) },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions.Default.copy(
-                            keyboardType = when (currentStep) {
-                                1 -> KeyboardType.Number // For Date
-                                else -> KeyboardType.Text
-                            }
+                            keyboardType = if (currentStep == 1) KeyboardType.Number else KeyboardType.Text
                         )
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
                     IconButton(
                         onClick = {
-                            if (steps[currentStep].second.value.text.isNotEmpty()) {
+                            if (when (currentStep) {
+                                    0 -> activityName.value.text.isNotEmpty()
+                                    1 -> activityDate.value.text.isNotEmpty()
+                                    2 -> activityLocation.value.text.isNotEmpty()
+                                    3 -> activityDescription.value.text.isNotEmpty()
+                                    else -> false
+                                }) {
                                 currentStep++
                             }
                         }
@@ -78,20 +105,33 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
                 }
             }
         } else {
-            // Une fois tous les champs remplis, appeler la fonction de création d'activité
-            onActivityCreated(
-                ActivityData(
-                    name = activityName.value.text,
-                    date = activityDate.value.text,
-                    location = activityLocation.value.text,
-                    description = activityDescription.value.text
-                )
-            )
-            Text(
-                text = "Activité créée avec succès !",
-                style = MaterialTheme.typography.titleSmall,
-                textAlign = TextAlign.Center
-            )
+            Button(onClick = {
+                if (currentUser != null) {
+                    val activity = hashMapOf(
+                        "userId" to currentUser.uid,
+                        "name" to activityName.value.text,
+                        "date" to activityDate.value.text,
+                        "location" to activityLocation.value.text,
+                        "description" to activityDescription.value.text,
+                    )
+                    db.collection("activities").add(activity)
+                        .addOnSuccessListener {
+                            onActivityCreated(
+                                ActivityData(
+                                    name = activityName.value.text,
+                                    date = activityDate.value.text,
+                                    location = activityLocation.value.text,
+                                    description = activityDescription.value.text
+                                )
+                            )
+                        }
+                        .addOnFailureListener {
+                            // Gérer l'échec de l'enregistrement
+                        }
+                }
+            }) {
+                Text("Enregistrer l'activité")
+            }
         }
     }
 }

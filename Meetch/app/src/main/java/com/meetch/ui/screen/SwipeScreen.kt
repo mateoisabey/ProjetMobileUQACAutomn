@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
@@ -20,27 +22,75 @@ import kotlin.math.roundToInt
 @SuppressLint("UnrememberedMutableState")
 @Composable
 fun SwipeScreen() {
-    val activities = listOf(
-        "Basketball à 16h",
-        "Football ce soir",
-        "Tennis demain",
-        "Cours de yoga à 18h"
-    )
+    val db = FirebaseFirestore.getInstance()
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    val ignoredActivities = remember { mutableStateListOf<String>() }
+
+    var activities by remember { mutableStateOf(listOf<String>()) }
+    var activityIds by remember { mutableStateOf(listOf<String>()) } // Liste des IDs pour identifier les activités
     var currentIndex by remember { mutableStateOf(0) }
     var offsetX by remember { mutableStateOf(0f) }
     var isSwiping by remember { mutableStateOf(false) }
     var isAnimationCompleted by remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
 
+    fun loadActivities() {
+        currentUser?.let { user ->
+            db.collection("activities")
+                .whereNotEqualTo("userId", user.uid)
+                .get()
+                .addOnSuccessListener { result ->
+                    val filteredActivities = result.documents.filterNot { document ->
+                        ignoredActivities.contains(document.id)
+                    }
+                    activities = filteredActivities.map { it.getString("name") ?: "" }
+                    activityIds = filteredActivities.map { it.id }
+                }
+                .addOnFailureListener { exception ->
+                    println("Erreur lors de la récupération des activités : ${exception.message}")
+                }
+        }
+    }
+    // Charger les activités ignorées depuis Firestore pour l'utilisateur actuel
+    LaunchedEffect(Unit) {
+        currentUser?.let { user ->
+            db.collection("users").document(user.uid).collection("ignoredActivities")
+                .get()
+                .addOnSuccessListener { result ->
+                    ignoredActivities.addAll(result.documents.map { it.id })
+                    loadActivities() // Charger les activités après avoir récupéré les ignorées
+                }
+                .addOnFailureListener { exception ->
+                    println("Erreur lors de la récupération des activités ignorées : ${exception.message}")
+                    loadActivities() // Charger les activités même en cas d'échec de récupération des ignorées
+                }
+        }
+    }
+
+    fun saveIgnoredActivity(activityId: String) {
+        currentUser?.let { user ->
+            db.collection("users").document(user.uid).collection("ignoredActivities")
+                .document(activityId)
+                .set(mapOf("ignored" to true))
+                .addOnFailureListener { exception ->
+                    println("Erreur lors de l'ajout de l'activité ignorée : ${exception.message}")
+                }
+        }
+    }
+
     val animatedOffsetX by animateFloatAsState(
         targetValue = offsetX,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         finishedListener = {
             isAnimationCompleted = true
-            // Le changement de carte se fait maintenant seulement après que l'animation est totalement terminée
             if (offsetX > 600f || offsetX < -600f) {
+                if (offsetX < 0) {
+                    val ignoredActivityId = activityIds[currentIndex]
+                    ignoredActivities.add(ignoredActivityId)
+                    saveIgnoredActivity(ignoredActivityId)
+                }
                 currentIndex++
-                offsetX = 0f // Réinitialiser après le swipe complet
+                offsetX = 0f
             }
             isSwiping = false
         }

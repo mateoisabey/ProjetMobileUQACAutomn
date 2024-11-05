@@ -1,6 +1,5 @@
 package com.meetch.ui.screen
 
-
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -8,46 +7,51 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import com.meetch.auth.FirebaseAuthManager
 
 @Composable
-fun LoginScreen(onLogin: (String, String) -> Unit, onRegister: () -> Unit) {
+fun LoginScreen(authManager: FirebaseAuthManager, navController: NavController, onLoginSuccess: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = "Connexion", style = MaterialTheme.typography.titleSmall)
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth()
-        )
+        TextField(value = email, onValueChange = { email = it }, label = { Text("Email") })
         Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedTextField(
+        TextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Mot de passe") },
-            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation()
         )
         Spacer(modifier = Modifier.height(16.dp))
-
-        Button(onClick = { onLogin(email, password) }, modifier = Modifier.fillMaxWidth()) {
-            Text(text = "Se connecter")
+        Button(onClick = {
+            authManager.loginWithEmail(email, password) { success, _, errorMessage ->
+                if (success) {
+                    println("Connexion réussie")
+                    onLoginSuccess()
+                } else {
+                    println("Échec de la connexion : $errorMessage")
+                    message = "Échec de la connexion : $errorMessage"
+                }
+            }
+        }) {
+            Text("Connexion")
         }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(text = message)
         Spacer(modifier = Modifier.height(16.dp))
-
-        TextButton(onClick = onRegister) {
-            Text(text = "Créer un compte")
+        TextButton(onClick = {
+            navController.navigate("sign_up")
+        }) {
+            Text("Vous n'avez pas de compte ? Inscrivez-vous")
         }
     }
 }
