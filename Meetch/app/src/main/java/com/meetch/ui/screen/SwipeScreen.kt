@@ -31,6 +31,7 @@ fun SwipeScreen() {
     val db = FirebaseFirestore.getInstance()
     val currentUser = FirebaseAuth.getInstance().currentUser
     val ignoredActivities = remember { mutableStateListOf<String>() }
+    val acceptedActivities = remember { mutableStateListOf<String>() } // Liste pour les activités acceptées
 
     var activities by remember { mutableStateOf(listOf<String>()) }
     var activityIds by remember { mutableStateOf(listOf<String>()) }
@@ -49,7 +50,7 @@ fun SwipeScreen() {
                 .get()
                 .addOnSuccessListener { result ->
                     val filteredActivities = result.documents.filterNot { document ->
-                        ignoredActivities.contains(document.id)
+                        ignoredActivities.contains(document.id) || acceptedActivities.contains(document.id)
                     }
                     activities = filteredActivities.map { it.getString("name") ?: "" }
                     activityIds = filteredActivities.map { it.id }
@@ -76,6 +77,17 @@ fun SwipeScreen() {
                     println("Erreur lors de la récupération des activités ignorées : ${exception.message}")
                     loadActivities()
                 }
+
+            db.collection("users").document(user.uid).collection("acceptedActivities")
+                .get()
+                .addOnSuccessListener { result ->
+                    acceptedActivities.addAll(result.documents.map { it.id })
+                    loadActivities()
+                }
+                .addOnFailureListener { exception ->
+                    println("Erreur lors de la récupération des activités acceptées : ${exception.message}")
+                    loadActivities()
+                }
         }
     }
 
@@ -86,6 +98,17 @@ fun SwipeScreen() {
                 .set(mapOf("ignored" to true))
                 .addOnFailureListener { exception ->
                     println("Erreur lors de l'ajout de l'activité ignorée : ${exception.message}")
+                }
+        }
+    }
+
+    fun saveAcceptedActivity(activityId: String) {
+        currentUser?.let { user ->
+            db.collection("users").document(user.uid).collection("acceptedActivities")
+                .document(activityId)
+                .set(mapOf("accepted" to true))
+                .addOnFailureListener { exception ->
+                    println("Erreur lors de l'ajout de l'activité acceptée : ${exception.message}")
                 }
         }
     }
@@ -113,7 +136,10 @@ fun SwipeScreen() {
     }
 
     fun swipeRight() {
-        sendMessageRequest(activityIds[currentIndex], creatorIds[currentIndex])
+        val acceptedActivityId = activityIds[currentIndex]
+        acceptedActivities.add(acceptedActivityId)
+        saveAcceptedActivity(acceptedActivityId) // Sauvegarder l'activité acceptée
+        sendMessageRequest(acceptedActivityId, creatorIds[currentIndex])
         currentIndex++
         offsetX = 0f
     }
