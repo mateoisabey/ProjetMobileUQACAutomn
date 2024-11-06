@@ -12,7 +12,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.Person
-
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -23,7 +22,6 @@ import com.meetch.ui.screen.ConversationsScreen
 import com.meetch.ui.screen.PostScreen
 import com.meetch.ui.screen.ProfileScreen
 import com.meetch.ui.screen.SwipeScreen
-
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 
@@ -31,8 +29,6 @@ import com.google.firebase.auth.FirebaseUser
 fun AppNavHost() {
     val navController: NavHostController = rememberNavController()
     var selectedItem by remember { mutableStateOf(0) }
-    val currentUser: FirebaseUser? = FirebaseAuth.getInstance().currentUser
-
     Scaffold(
         bottomBar = {
             BottomNavigationBar(navController, selectedItem, onItemSelected = { selectedItem = it })
@@ -49,9 +45,11 @@ fun AppNavHost() {
             composable("conversations") {
                 ConversationsScreen(navController)
             }
-            composable("conversationDetail/{conversationTitle}") { backStackEntry ->
+            composable("conversationDetail/{conversationTitle}/{messageRequestId}/{fromUserId}") { backStackEntry ->
                 val conversationTitle = backStackEntry.arguments?.getString("conversationTitle") ?: "Détails"
-                ConversationDetailScreen(navController, conversationTitle)
+                val messageRequestId = backStackEntry.arguments?.getString("messageRequestId") ?: ""
+                val fromUserId = backStackEntry.arguments?.getString("fromUserId") ?: ""
+                ConversationDetailScreen(navController, conversationTitle, messageRequestId, fromUserId)
             }
             composable("post") {
                 PostScreen { activityData ->
@@ -67,6 +65,7 @@ fun AppNavHost() {
         }
     }
 }
+
 @Composable
 fun BottomNavigationBar(
     navController: NavHostController,
