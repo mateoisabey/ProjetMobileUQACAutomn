@@ -1,36 +1,55 @@
 package com.meetch.ui.screen
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
     var currentStep by remember { mutableStateOf(0) }
-
-    // Collecte des informations
     val activityName = remember { mutableStateOf(TextFieldValue("")) }
-    val activityDate = remember { mutableStateOf(TextFieldValue("")) }
-    val activityLocation = remember { mutableStateOf(TextFieldValue("")) }
+    val activityDate = remember { mutableStateOf("") }
+    val activityLocation = remember { mutableStateOf("") }
     val activityDescription = remember { mutableStateOf(TextFieldValue("")) }
 
-    // Firebase instances
     val db = FirebaseFirestore.getInstance()
     val currentUser = FirebaseAuth.getInstance().currentUser
 
+    val context = LocalContext.current
+
+    // Liste des options pour le lieu
+    val locationOptions = listOf("Stade", "Salle de gym", "Piscine", "Parc")
+    var isDropdownExpanded by remember { mutableStateOf(false) }
+
+    // Function to show the DatePicker dialog
+    fun showDatePickerDialog() {
+        val calendar = Calendar.getInstance()
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                activityDate.value = "$dayOfMonth/${month + 1}/$year"
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        if (currentStep < 4) {  // Le 4 correspond à l'indice de la description dans les étapes
+        if (currentStep < 4) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth(0.75f)
@@ -57,42 +76,74 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    OutlinedTextField(
-                        value = when (currentStep) {
-                            0 -> activityName.value
-                            1 -> activityDate.value
-                            2 -> activityLocation.value
-                            3 -> activityDescription.value
-                            else -> TextFieldValue("")
-                        },
-                        onValueChange = { textFieldValue ->
-                            when (currentStep) {
-                                0 -> activityName.value = textFieldValue
-                                1 -> activityDate.value = textFieldValue
-                                2 -> activityLocation.value = textFieldValue
-                                3 -> activityDescription.value = textFieldValue
+                    when (currentStep) {
+                        0 -> {
+                            OutlinedTextField(
+                                value = activityName.value,
+                                onValueChange = { activityName.value = it },
+                                label = { Text("Nom") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        1 -> {
+                            Button(onClick = { showDatePickerDialog() }) {
+                                Text(
+                                    text = if (activityDate.value.isEmpty()) "Sélectionnez la date" else activityDate.value
+                                )
                             }
-                        },
-                        label = { Text(when (currentStep) {
-                            0 -> "Nom"
-                            1 -> "Date"
-                            2 -> "Lieu"
-                            3 -> "Description"
-                            else -> ""
-                        }) },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions.Default.copy(
-                            keyboardType = if (currentStep == 1) KeyboardType.Number else KeyboardType.Text
-                        )
-                    )
+                        }
+                        2 -> {
+                            // Utilisation d'un menu déroulant pour le lieu
+                            ExposedDropdownMenuBox(
+                                expanded = isDropdownExpanded,
+                                onExpandedChange = { isDropdownExpanded = !isDropdownExpanded }
+                            ) {
+                                OutlinedTextField(
+                                    value = activityLocation.value,
+                                    onValueChange = { },
+                                    label = { Text("Lieu") },
+                                    readOnly = true,
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isDropdownExpanded)
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor()
+                                )
+
+                                ExposedDropdownMenu(
+                                    expanded = isDropdownExpanded,
+                                    onDismissRequest = { isDropdownExpanded = false }
+                                ) {
+                                    locationOptions.forEach { location ->
+                                        DropdownMenuItem(
+                                            text = { Text(location) },
+                                            onClick = {
+                                                activityLocation.value = location
+                                                isDropdownExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        3 -> {
+                            OutlinedTextField(
+                                value = activityDescription.value,
+                                onValueChange = { activityDescription.value = it },
+                                label = { Text("Description") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(16.dp))
                     IconButton(
                         onClick = {
                             if (when (currentStep) {
                                     0 -> activityName.value.text.isNotEmpty()
-                                    1 -> activityDate.value.text.isNotEmpty()
-                                    2 -> activityLocation.value.text.isNotEmpty()
+                                    1 -> activityDate.value.isNotEmpty()
+                                    2 -> activityLocation.value.isNotEmpty()
                                     3 -> activityDescription.value.text.isNotEmpty()
                                     else -> false
                                 }) {
@@ -110,8 +161,8 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
                     val activity = hashMapOf(
                         "userId" to currentUser.uid,
                         "name" to activityName.value.text,
-                        "date" to activityDate.value.text,
-                        "location" to activityLocation.value.text,
+                        "date" to activityDate.value,
+                        "location" to activityLocation.value,
                         "description" to activityDescription.value.text,
                     )
                     db.collection("activities").add(activity)
@@ -119,8 +170,8 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
                             onActivityCreated(
                                 ActivityData(
                                     name = activityName.value.text,
-                                    date = activityDate.value.text,
-                                    location = activityLocation.value.text,
+                                    date = activityDate.value,
+                                    location = activityLocation.value,
                                     description = activityDescription.value.text
                                 )
                             )

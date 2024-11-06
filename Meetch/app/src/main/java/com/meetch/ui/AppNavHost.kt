@@ -19,11 +19,11 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.ui.Modifier
 import com.meetch.ui.screen.ConversationDetailScreen
 import com.meetch.ui.screen.ConversationsScreen
-import com.meetch.ui.screen.PostScreen
 import com.meetch.ui.screen.ProfileScreen
 import com.meetch.ui.screen.SwipeScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.meetch.ui.screen.PostScreen
 
 @Composable
 fun AppNavHost() {
