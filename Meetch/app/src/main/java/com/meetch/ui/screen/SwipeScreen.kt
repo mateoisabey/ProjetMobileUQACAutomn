@@ -1,37 +1,29 @@
 package com.meetch.ui.screen
 
 import android.annotation.SuppressLint
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.text.style.TextAlign
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
+import com.meetch.R
 
 @SuppressLint("UnrememberedMutableState")
 @Composable
@@ -43,6 +35,10 @@ fun SwipeScreen() {
     var activities by remember { mutableStateOf(listOf<String>()) }
     var activityIds by remember { mutableStateOf(listOf<String>()) }
     var creatorIds by remember { mutableStateOf(listOf<String>()) }
+    var dates by remember { mutableStateOf(listOf<String>()) }
+    var descriptions by remember { mutableStateOf(listOf<String>()) }
+    var locations by remember { mutableStateOf(listOf<String>()) }
+
     var currentIndex by remember { mutableStateOf(0) }
     var offsetX by remember { mutableStateOf(0f) }
 
@@ -58,6 +54,9 @@ fun SwipeScreen() {
                     activities = filteredActivities.map { it.getString("name") ?: "" }
                     activityIds = filteredActivities.map { it.id }
                     creatorIds = filteredActivities.map { it.getString("userId") ?: "" }
+                    dates = filteredActivities.map { it.getString("date") ?: "" }
+                    descriptions = filteredActivities.map { it.getString("description") ?: "" }
+                    locations = filteredActivities.map { it.getString("location") ?: "" }
                 }
                 .addOnFailureListener { exception ->
                     println("Erreur lors de la récupération des activités : ${exception.message}")
@@ -119,74 +118,120 @@ fun SwipeScreen() {
         offsetX = 0f
     }
 
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        if (currentIndex < activities.size) {
-            val activityName = activities[currentIndex]
-
-            Card(
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0D1B2A)), // Couleur de fond adaptée à celle du logo
+        contentAlignment = Alignment.Center
+    ) {
+        // Bannière en haut avec le logo
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Image(
+                painter = painterResource(id = R.drawable.logo), // Utilisez l'image du logo avec le chemin fourni
+                contentDescription = "Logo de Meetch",
                 modifier = Modifier
-                    .fillMaxWidth(0.75f)
-                    .aspectRatio(1f)
-                    .offset { IntOffset(offsetX.toInt(), 0) }
-                    .padding(16.dp)
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                if (offsetX > 600f) {
-                                    swipeRight()
-                                } else if (offsetX < -600f) {
-                                    swipeLeft()
-                                } else {
-                                    offsetX = 0f
-                                }
-                            },
-                            onHorizontalDrag = { _, dragAmount ->
-                                offsetX += dragAmount
-                            }
-                        )
-                    },
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-            ) {
-                Text(
-                    text = activityName,
-                    style = MaterialTheme.typography.titleSmall,
+                    .fillMaxWidth()
+                    .height(80.dp) // Hauteur ajustée pour afficher comme une bannière
+                    .padding(top = 16.dp),
+                contentScale = ContentScale.Fit
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (currentIndex < activities.size) {
+                // Récupération des informations pour l’activité actuelle
+                val activityName = activities[currentIndex]
+                val activityDate = dates[currentIndex]
+                val activityDescription = descriptions[currentIndex]
+                val activityLocation = locations[currentIndex]
+
+                Card(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        .fillMaxWidth(0.9f)
+                        .aspectRatio(0.75f)
+                        .offset { IntOffset(offsetX.toInt(), 0) }
+                        .padding(16.dp)
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures(
+                                onDragEnd = {
+                                    if (offsetX > 600f) {
+                                        swipeRight()
+                                    } else if (offsetX < -600f) {
+                                        swipeLeft()
+                                    } else {
+                                        offsetX = 0f
+                                    }
+                                },
+                                onHorizontalDrag = { _, dragAmount ->
+                                    offsetX += dragAmount
+                                }
+                            )
+                        },
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFF6F00)) // Couleur orange pour le fond de la carte
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = activityName,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Color.White,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            text = "Lieu : $activityLocation\nDate : $activityDate\n\nDescription : $activityDescription",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = "Aucune autre activité disponible",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White,
+                    modifier = Modifier.padding(16.dp)
                 )
             }
-        } else {
-            Text(
-                text = "Aucune autre activité disponible",
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(16.dp)
-            )
         }
 
         if (currentIndex < activities.size) {
-            Column(
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 32.dp),
-                verticalArrangement = Arrangement.Bottom,
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxWidth()
+                    .padding(32.dp)
+                    .align(Alignment.BottomCenter),
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                IconButton(
+                    onClick = { swipeLeft() },
+                    modifier = Modifier.size(64.dp)
                 ) {
-                    Button(
-                        onClick = { swipeLeft() }
-                    ) {
-                        Text(text = "Ignorer")
-                    }
-                    Button(
-                        onClick = { swipeRight() }
-                    ) {
-                        Text(text = "Participer")
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Ignorer",
+                        tint = Color.Red,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+                IconButton(
+                    onClick = { swipeRight() },
+                    modifier = Modifier.size(64.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Participer",
+                        tint = Color.Green,
+                        modifier = Modifier.size(48.dp)
+                    )
                 }
             }
         }
