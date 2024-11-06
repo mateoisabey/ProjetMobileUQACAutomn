@@ -29,8 +29,6 @@ import com.google.firebase.auth.FirebaseUser
 fun AppNavHost() {
     val navController: NavHostController = rememberNavController()
     var selectedItem by remember { mutableStateOf(0) }
-    val currentUser: FirebaseUser? = FirebaseAuth.getInstance().currentUser
-
     Scaffold(
         bottomBar = {
             BottomNavigationBar(navController, selectedItem, onItemSelected = { selectedItem = it })
