@@ -1,6 +1,6 @@
 package com.meetch.ui
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.navigation.NavHostController
@@ -12,33 +12,44 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.ui.Modifier
+import com.meetch.auth.FirebaseAuthManager
 import com.meetch.ui.screen.ConversationDetailScreen
 import com.meetch.ui.screen.ConversationsScreen
+import com.meetch.ui.screen.LoginScreen
 import com.meetch.ui.screen.ProfileScreen
 import com.meetch.ui.screen.SwipeScreen
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
 import com.meetch.ui.screen.PostScreen
 
 @Composable
-fun AppNavHost() {
+fun AppNavHost(authManager: FirebaseAuthManager) {
     val navController: NavHostController = rememberNavController()
     var selectedItem by remember { mutableStateOf(0) }
+    val startDestination = if (authManager.isUserLoggedIn()) "swipe" else "login"
+
     Scaffold(
         bottomBar = {
-            BottomNavigationBar(navController, selectedItem, onItemSelected = { selectedItem = it })
+            if (startDestination != "login") { // Cacher la barre de navigation sur l'écran de connexion
+                BottomNavigationBar(navController, selectedItem, onItemSelected = { selectedItem = it })
+            }
         }
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = "swipe",
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding)
         ) {
+            composable("login") {
+                LoginScreen(
+                    authManager = authManager,
+                    navController = navController,
+                    onLoginSuccess = {
+                        navController.navigate("swipe") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                )
+            }
             composable("swipe") {
                 SwipeScreen()
             }
@@ -59,7 +70,13 @@ fun AppNavHost() {
             }
             composable("profile") {
                 ProfileScreen(
-                    onEditProfile = { }
+                    onEditProfile = { },
+                    onLogout = {
+                        authManager.logout()
+                        navController.navigate("login") {
+                            popUpTo("swipe") { inclusive = true }
+                        }
+                    }
                 )
             }
         }

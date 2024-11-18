@@ -12,7 +12,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
-fun ProfileScreen(onEditProfile: () -> Unit) {
+fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
     var userName by remember { mutableStateOf("") }
     var userGender by remember { mutableStateOf("") }
     var userCity by remember { mutableStateOf("") }
@@ -39,7 +39,6 @@ fun ProfileScreen(onEditProfile: () -> Unit) {
                 }
                 .addOnFailureListener {
                     loading = false
-                    // Gérer l'erreur ici si besoin
                 }
         }
     }
@@ -128,7 +127,6 @@ fun ProfileScreen(onEditProfile: () -> Unit) {
                                     db.collection("userData").document(user.uid).set(updatedData)
                                         .addOnSuccessListener {
                                             isEditing = false
-                                            // Afficher un message de succès si besoin
                                         }
                                         .addOnFailureListener {
                                             // Gérer l'erreur ici si besoin
@@ -174,6 +172,22 @@ fun ProfileScreen(onEditProfile: () -> Unit) {
                         ) {
                             Text(text = "Modifier le profil", color = Color.White)
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Bouton de déconnexion
+                    Button(
+                        onClick = {
+                            FirebaseAuth.getInstance().signOut()
+                            onLogout()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    ) {
+                        Text(text = "Se déconnecter", color = Color.White)
                     }
                 }
             }

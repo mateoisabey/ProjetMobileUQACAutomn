@@ -2,6 +2,7 @@ package com.meetch.ui.screen
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -9,7 +10,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.google.firebase.auth.FirebaseAuth
@@ -25,26 +28,36 @@ fun ConversationDetailScreen(
 ) {
     val db = FirebaseFirestore.getInstance()
     val currentUser = FirebaseAuth.getInstance().currentUser
-    val messages = remember { mutableStateListOf<Pair<String, String>>() } // Pair de message et de l'auteur (fromUserId)
+    val messages = remember { mutableStateListOf<Triple<String, String, Long>>() } // Triple de senderId, message, timestamp
     var newMessage by remember { mutableStateOf("") }
     var isConversationAccepted by remember { mutableStateOf(false) }
-    val isRequestReceiver = currentUser?.uid != fromUserId // Est-ce que l'utilisateur connecté est le destinataire de la requête ?
+    val isRequestReceiver = currentUser?.uid != fromUserId
 
-    // Charger les messages de la conversation existante
+    // Charger les messages en temps réel
     LaunchedEffect(Unit) {
         db.collection("conversations").document(messageRequestId).collection("messages")
-            .get()
-            .addOnSuccessListener { result ->
-                messages.clear()
-                for (document in result) {
+            .orderBy("timestamp") // Assurez-vous que Firestore est bien configuré pour cette règle d'ordre
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    println("Erreur lors de la récupération des messages : ${e.message}")
+                    return@addSnapshotListener
+                }
+
+                val updatedMessages = snapshot?.documents?.map { document ->
                     val message = document.getString("message") ?: ""
                     val senderId = document.getString("fromUserId") ?: ""
-                    messages.add(senderId to message)
-                }
+                    val timestamp = document.getLong("timestamp") ?: 0L
+                    Triple(senderId, message, timestamp)
+                } ?: emptyList()
+
+                messages.clear()
+                messages.addAll(updatedMessages)
             }
-            .addOnFailureListener { exception ->
-                println("Erreur lors de la récupération des messages : ${exception.message}")
-            }
+
+        currentUser?.let { user ->
+            db.collection("conversations").document(messageRequestId)
+                .update("lastReadTimestamp_${user.uid}", System.currentTimeMillis())
+        }
 
         // Vérifier si la conversation a déjà été acceptée
         db.collection("conversations").document(messageRequestId)
@@ -76,27 +89,42 @@ fun ConversationDetailScreen(
                 .padding(16.dp)
         ) {
             LazyColumn(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                reverseLayout = false // Assurez-vous que cette propriété est `false`
             ) {
-                items(messages.size) { index ->
-                    val (senderId, messageText) = messages[index]
+                items(messages) { (senderId, messageText, _) ->
                     val isCurrentUser = senderId == currentUser?.uid
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = if (isCurrentUser) Arrangement.End else Arrangement.Start
                     ) {
-                        Text(
-                            text = if (isCurrentUser) "Moi: $messageText" else "$conversationTitle: $messageText",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isCurrentUser) Color(0xFF4CAF50) else Color(0xFF2196F3)
+                            ),
+                            modifier = Modifier
+                                .widthIn(max = 250.dp)
+                        ) {
+                            Text(
+                                text = messageText,
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
                     }
                 }
             }
 
             if (isConversationAccepted) {
-                Row(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     OutlinedTextField(
                         value = newMessage,
                         onValueChange = { newMessage = it },
@@ -115,12 +143,14 @@ fun ConversationDetailScreen(
                                 .collection("messages")
                                 .add(messageData)
                                 .addOnSuccessListener {
-                                    messages.add((currentUser?.uid to newMessage) as Pair<String, String>)
                                     newMessage = ""
                                 }
                                 .addOnFailureListener { exception ->
                                     println("Erreur lors de l'envoi du message : ${exception.message}")
                                 }
+
+                            db.collection("conversations").document(messageRequestId)
+                                .update("lastMessageTimestamp", System.currentTimeMillis())
                         }
                     }) {
                         Icon(imageVector = Icons.Default.Send, contentDescription = "Envoyer")
@@ -137,19 +167,34 @@ fun ConversationDetailScreen(
                         db.collection("messageRequests").document(messageRequestId)
                             .delete()
                             .addOnSuccessListener {
+                                println("Requête refusée et supprimée.")
                                 navController.popBackStack()
                             }
                             .addOnFailureListener { exception ->
-                                println("Erreur lors de la suppression de la demande de message : ${exception.message}")
+                                println("Erreur lors de la suppression de la requête : ${exception.message}")
                             }
                     }) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Refuser")
                     }
                     IconButton(onClick = {
                         db.collection("conversations").document(messageRequestId)
-                            .set(mapOf("fromUserId" to fromUserId, "toUserId" to currentUser?.uid))
+                            .set(
+                                mapOf(
+                                    "fromUserId" to fromUserId,
+                                    "toUserId" to currentUser?.uid,
+                                    "participants" to listOf(fromUserId, currentUser?.uid),
+                                    "lastMessageTimestamp" to System.currentTimeMillis()
+                                )
+                            )
                             .addOnSuccessListener {
-                                isConversationAccepted = true
+                                db.collection("messageRequests").document(messageRequestId).delete()
+                                    .addOnSuccessListener {
+                                        println("Requête acceptée et convertie en conversation.")
+                                        isConversationAccepted = true
+                                    }
+                                    .addOnFailureListener { exception ->
+                                        println("Erreur lors de la suppression de la requête : ${exception.message}")
+                                    }
                             }
                             .addOnFailureListener { exception ->
                                 println("Erreur lors de la création de la conversation : ${exception.message}")

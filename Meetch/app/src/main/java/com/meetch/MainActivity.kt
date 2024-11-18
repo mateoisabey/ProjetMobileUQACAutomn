@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 composable("main_screen") {
-                    AppNavHost()
+                    AppNavHost(authManager = authManager)
                 }
             }
         }

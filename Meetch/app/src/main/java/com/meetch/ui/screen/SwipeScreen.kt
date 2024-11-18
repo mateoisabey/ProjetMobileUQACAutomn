@@ -24,14 +24,13 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import com.meetch.R
-
 @SuppressLint("UnrememberedMutableState")
 @Composable
 fun SwipeScreen() {
     val db = FirebaseFirestore.getInstance()
     val currentUser = FirebaseAuth.getInstance().currentUser
     val ignoredActivities = remember { mutableStateListOf<String>() }
-    val acceptedActivities = remember { mutableStateListOf<String>() } // Liste pour les activités acceptées
+    val acceptedActivities = remember { mutableStateListOf<String>() }
 
     var activities by remember { mutableStateOf(listOf<String>()) }
     var activityIds by remember { mutableStateOf(listOf<String>()) }
@@ -43,50 +42,57 @@ fun SwipeScreen() {
     var currentIndex by remember { mutableStateOf(0) }
     var offsetX by remember { mutableStateOf(0f) }
 
-    fun loadActivities() {
+    // Fonction pour charger les activités avec un listener en temps réel
+    fun loadActivitiesWithListener() {
         currentUser?.let { user ->
             db.collection("activities")
                 .whereNotEqualTo("userId", user.uid)
-                .get()
-                .addOnSuccessListener { result ->
-                    val filteredActivities = result.documents.filterNot { document ->
-                        ignoredActivities.contains(document.id) || acceptedActivities.contains(document.id)
+                .addSnapshotListener { snapshot, e ->
+                    if (e != null) {
+                        println("Erreur lors de la récupération des activités : ${e.message}")
+                        return@addSnapshotListener
                     }
+
+                    val filteredActivities = snapshot?.documents?.filterNot { document ->
+                        ignoredActivities.contains(document.id) || acceptedActivities.contains(document.id)
+                    } ?: emptyList()
+
                     activities = filteredActivities.map { it.getString("name") ?: "" }
                     activityIds = filteredActivities.map { it.id }
                     creatorIds = filteredActivities.map { it.getString("userId") ?: "" }
                     dates = filteredActivities.map { it.getString("date") ?: "" }
                     descriptions = filteredActivities.map { it.getString("description") ?: "" }
                     locations = filteredActivities.map { it.getString("location") ?: "" }
-                }
-                .addOnFailureListener { exception ->
-                    println("Erreur lors de la récupération des activités : ${exception.message}")
+
+                    // Réinitialiser l'index si nécessaire
+                    currentIndex = 0
                 }
         }
     }
 
     LaunchedEffect(Unit) {
         currentUser?.let { user ->
+            // Charger les activités ignorées et acceptées
             db.collection("users").document(user.uid).collection("ignoredActivities")
                 .get()
                 .addOnSuccessListener { result ->
                     ignoredActivities.addAll(result.documents.map { it.id })
-                    loadActivities()
+                    loadActivitiesWithListener()
                 }
                 .addOnFailureListener { exception ->
                     println("Erreur lors de la récupération des activités ignorées : ${exception.message}")
-                    loadActivities()
+                    loadActivitiesWithListener()
                 }
 
             db.collection("users").document(user.uid).collection("acceptedActivities")
                 .get()
                 .addOnSuccessListener { result ->
                     acceptedActivities.addAll(result.documents.map { it.id })
-                    loadActivities()
+                    loadActivitiesWithListener()
                 }
                 .addOnFailureListener { exception ->
                     println("Erreur lors de la récupération des activités acceptées : ${exception.message}")
-                    loadActivities()
+                    loadActivitiesWithListener()
                 }
         }
     }
@@ -138,7 +144,7 @@ fun SwipeScreen() {
     fun swipeRight() {
         val acceptedActivityId = activityIds[currentIndex]
         acceptedActivities.add(acceptedActivityId)
-        saveAcceptedActivity(acceptedActivityId) // Sauvegarder l'activité acceptée
+        saveAcceptedActivity(acceptedActivityId)
         sendMessageRequest(acceptedActivityId, creatorIds[currentIndex])
         currentIndex++
         offsetX = 0f
@@ -147,17 +153,16 @@ fun SwipeScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0D1B2A)), // Couleur de fond adaptée à celle du logo
+            .background(Color(0xFF0D1B2A)),
         contentAlignment = Alignment.Center
     ) {
-        // Bannière en haut avec le logo
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Image(
-                painter = painterResource(id = R.drawable.logo), // Utilisez l'image du logo avec le chemin fourni
+                painter = painterResource(id = R.drawable.logo),
                 contentDescription = "Logo de Meetch",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(80.dp) // Hauteur ajustée pour afficher comme une bannière
+                    .height(80.dp)
                     .padding(top = 16.dp),
                 contentScale = ContentScale.Fit
             )
@@ -165,7 +170,6 @@ fun SwipeScreen() {
             Spacer(modifier = Modifier.height(24.dp))
 
             if (currentIndex < activities.size) {
-                // Récupération des informations pour l’activité actuelle
                 val activityName = activities[currentIndex]
                 val activityDate = dates[currentIndex]
                 val activityDescription = descriptions[currentIndex]
@@ -195,7 +199,7 @@ fun SwipeScreen() {
                         },
                     shape = RoundedCornerShape(16.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFF6F00)) // Couleur orange pour le fond de la carte
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFF6F00))
                 ) {
                     Column(
                         modifier = Modifier

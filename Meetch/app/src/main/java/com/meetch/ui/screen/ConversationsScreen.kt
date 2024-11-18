@@ -1,5 +1,6 @@
 package com.meetch.ui.screen
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,18 +20,22 @@ fun ConversationsScreen(navController: NavHostController) {
     // Sections distinctes : requêtes de messages et conversations existantes
     var messageRequests by remember { mutableStateOf(listOf<Triple<String, String, String>>()) }
     var existingConversations by remember { mutableStateOf(listOf<Triple<String, String, String>>()) }
+    var unreadConversations by remember { mutableStateOf(setOf<String>()) } // Conserve les IDs des conversations avec des messages non lus
 
+    // Charger les requêtes de messages en temps réel
     LaunchedEffect(Unit) {
         currentUser?.let { user ->
-            val requestsList = mutableListOf<Triple<String, String, String>>()
-            val conversationsList = mutableListOf<Triple<String, String, String>>()
-
-            // Charger les requêtes de messages
+            // Listener pour les requêtes de messages
             db.collection("messageRequests")
                 .whereEqualTo("toUserId", user.uid)
-                .get()
-                .addOnSuccessListener { result ->
-                    result.documents.forEach { document ->
+                .addSnapshotListener { snapshot, e ->
+                    if (e != null) {
+                        println("Erreur lors de la récupération des requêtes de messages : ${e.message}")
+                        return@addSnapshotListener
+                    }
+
+                    val requestsList = mutableListOf<Triple<String, String, String>>()
+                    snapshot?.documents?.forEach { document ->
                         val fromUserId = document.getString("fromUserId") ?: ""
                         val activityId = document.getString("activityId") ?: ""
                         val messageRequestId = document.id
@@ -57,21 +62,31 @@ fun ConversationsScreen(navController: NavHostController) {
                             }
                     }
                 }
-                .addOnFailureListener { exception ->
-                    println("Erreur lors de la récupération des demandes de messages : ${exception.message}")
-                }
 
-            // Charger les conversations existantes
+            // Listener pour les conversations existantes
             db.collection("conversations")
                 .whereArrayContains("participants", user.uid)
-                .get()
-                .addOnSuccessListener { result ->
-                    result.documents.forEach { document ->
+                .addSnapshotListener { snapshot, e ->
+                    if (e != null) {
+                        println("Erreur lors de la récupération des conversations : ${e.message}")
+                        return@addSnapshotListener
+                    }
+
+                    val conversationsList = mutableListOf<Triple<String, String, String>>()
+                    val unreadList = mutableSetOf<String>()
+
+                    snapshot?.documents?.forEach { document ->
+                        val conversationId = document.id
                         val fromUserId = document.getString("fromUserId") ?: ""
                         val toUserId = document.getString("toUserId") ?: ""
-                        val conversationId = document.id
 
-                        // Déterminer le nom d'affichage pour la conversation
+                        // Déterminer si la conversation a des messages non lus
+                        val lastReadTimestamp = document.getLong("lastReadTimestamp_${user.uid}") ?: 0L
+                        val lastMessageTimestamp = document.getLong("lastMessageTimestamp") ?: 0L
+                        if (lastMessageTimestamp > lastReadTimestamp) {
+                            unreadList.add(conversationId)
+                        }
+
                         db.collection("userData").document(if (fromUserId == user.uid) toUserId else fromUserId)
                             .get()
                             .addOnSuccessListener { userDoc ->
@@ -83,9 +98,7 @@ fun ConversationsScreen(navController: NavHostController) {
                                 println("Erreur lors de la récupération des informations de l'utilisateur : ${exception.message}")
                             }
                     }
-                }
-                .addOnFailureListener { exception ->
-                    println("Erreur lors de la récupération des conversations : ${exception.message}")
+                    unreadConversations = unreadList
                 }
         }
     }
@@ -122,7 +135,6 @@ fun ConversationsScreen(navController: NavHostController) {
                                         .addOnSuccessListener {
                                             // Mettre à jour les listes
                                             messageRequests = messageRequests.filterNot { it.second == messageRequestId }
-                                            existingConversations = existingConversations + Triple(requestTitle, messageRequestId, fromUserId)
                                         }
                                         .addOnFailureListener { exception ->
                                             println("Erreur lors de la suppression de la requête : ${exception.message}")
@@ -150,8 +162,12 @@ fun ConversationsScreen(navController: NavHostController) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(8.dp)
+                        .background(if (unreadConversations.contains(conversationId)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
                         .clickable {
                             navController.navigate("conversationDetail/$conversationTitle/$conversationId/$fromUserId")
+                            // Marquer la conversation comme lue
+                            db.collection("conversations").document(conversationId)
+                                .update("lastReadTimestamp_${currentUser?.uid}", System.currentTimeMillis())
                         }
                 ) {
                     Text(
