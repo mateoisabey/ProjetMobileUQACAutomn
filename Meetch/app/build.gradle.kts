@@ -79,4 +79,5 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-database-ktx")
     implementation ("com.google.firebase:firebase-messaging")
+    implementation ("io.coil-kt:coil-compose:2.2.2")
 }

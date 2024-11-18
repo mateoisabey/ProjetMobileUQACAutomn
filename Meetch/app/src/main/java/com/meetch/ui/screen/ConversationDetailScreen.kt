@@ -17,7 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationDetailScreen(
@@ -28,15 +27,18 @@ fun ConversationDetailScreen(
 ) {
     val db = FirebaseFirestore.getInstance()
     val currentUser = FirebaseAuth.getInstance().currentUser
-    val messages = remember { mutableStateListOf<Triple<String, String, Long>>() } // Triple de senderId, message, timestamp
+    val messages = remember { mutableStateListOf<Triple<String, String, Long>>() }
     var newMessage by remember { mutableStateOf("") }
     var isConversationAccepted by remember { mutableStateOf(false) }
     val isRequestReceiver = currentUser?.uid != fromUserId
 
+    var isProfileDialogOpen by remember { mutableStateOf(false) }
+    var userInfo by remember { mutableStateOf(mapOf<String, String>()) }
+
     // Charger les messages en temps réel
     LaunchedEffect(Unit) {
         db.collection("conversations").document(messageRequestId).collection("messages")
-            .orderBy("timestamp") // Assurez-vous que Firestore est bien configuré pour cette règle d'ordre
+            .orderBy("timestamp")
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
                     println("Erreur lors de la récupération des messages : ${e.message}")
@@ -70,10 +72,35 @@ fun ConversationDetailScreen(
             }
     }
 
+    // Fonction pour charger les informations de l'utilisateur
+    fun loadUserInfo(userId: String) {
+        db.collection("userData").document(userId)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    userInfo = mapOf(
+                        "name" to (document.getString("name") ?: "Inconnu"),
+                        "age" to (document.getString("age") ?: "Inconnu"),
+                        "gender" to (document.getString("gender") ?: "Inconnu"),
+                        "city" to (document.getString("city") ?: "Inconnu"),
+                        "sports" to (document.get("sports") as? List<*> ?: listOf<String>()).joinToString(", ")
+                    )
+                    isProfileDialogOpen = true
+                }
+            }
+            .addOnFailureListener { exception ->
+                println("Erreur lors de la récupération des informations de l'utilisateur : ${exception.message}")
+            }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = conversationTitle) },
+                title = {
+                    TextButton(onClick = { loadUserInfo(fromUserId) }) {
+                        Text(text = conversationTitle, color = MaterialTheme.colorScheme.onBackground)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Retour")
@@ -89,8 +116,7 @@ fun ConversationDetailScreen(
                 .padding(16.dp)
         ) {
             LazyColumn(
-                modifier = Modifier.weight(1f),
-                reverseLayout = false // Assurez-vous que cette propriété est `false`
+                modifier = Modifier.weight(1f)
             ) {
                 items(messages) { (senderId, messageText, _) ->
                     val isCurrentUser = senderId == currentUser?.uid
@@ -156,54 +182,28 @@ fun ConversationDetailScreen(
                         Icon(imageVector = Icons.Default.Send, contentDescription = "Envoyer")
                     }
                 }
-            } else if (isRequestReceiver) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    IconButton(onClick = {
-                        db.collection("messageRequests").document(messageRequestId)
-                            .delete()
-                            .addOnSuccessListener {
-                                println("Requête refusée et supprimée.")
-                                navController.popBackStack()
-                            }
-                            .addOnFailureListener { exception ->
-                                println("Erreur lors de la suppression de la requête : ${exception.message}")
-                            }
-                    }) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Refuser")
-                    }
-                    IconButton(onClick = {
-                        db.collection("conversations").document(messageRequestId)
-                            .set(
-                                mapOf(
-                                    "fromUserId" to fromUserId,
-                                    "toUserId" to currentUser?.uid,
-                                    "participants" to listOf(fromUserId, currentUser?.uid),
-                                    "lastMessageTimestamp" to System.currentTimeMillis()
-                                )
-                            )
-                            .addOnSuccessListener {
-                                db.collection("messageRequests").document(messageRequestId).delete()
-                                    .addOnSuccessListener {
-                                        println("Requête acceptée et convertie en conversation.")
-                                        isConversationAccepted = true
-                                    }
-                                    .addOnFailureListener { exception ->
-                                        println("Erreur lors de la suppression de la requête : ${exception.message}")
-                                    }
-                            }
-                            .addOnFailureListener { exception ->
-                                println("Erreur lors de la création de la conversation : ${exception.message}")
-                            }
-                    }) {
-                        Icon(imageVector = Icons.Default.Check, contentDescription = "Accepter")
-                    }
-                }
             }
         }
+    }
+
+    if (isProfileDialogOpen) {
+        AlertDialog(
+            onDismissRequest = { isProfileDialogOpen = false },
+            title = { Text("Informations de l'utilisateur") },
+            text = {
+                Column {
+                    Text("Nom : ${userInfo["name"]}")
+                    Text("Âge : ${userInfo["age"]}")
+                    Text("Genre : ${userInfo["gender"]}")
+                    Text("Ville : ${userInfo["city"]}")
+                    Text("Sports pratiqués : ${userInfo["sports"]}")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { isProfileDialogOpen = false }) {
+                    Text("Fermer")
+                }
+            }
+        )
     }
 }
