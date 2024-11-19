@@ -2,6 +2,8 @@ package com.meetch.ui.screen
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,7 +19,8 @@ fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
     var userGender by remember { mutableStateOf("") }
     var userCity by remember { mutableStateOf("") }
     var userAge by remember { mutableStateOf("") }
-    var sports by remember { mutableStateOf(listOf<String>()) }
+    var newSport by remember { mutableStateOf("") }
+    var sports by remember { mutableStateOf(mutableListOf<String>()) }
     var loading by remember { mutableStateOf(true) }
     var isEditing by remember { mutableStateOf(false) }
 
@@ -30,7 +33,7 @@ fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
                 .addOnSuccessListener { document ->
                     if (document != null && document.exists()) {
                         userName = document.getString("name") ?: ""
-                        sports = document.get("sports") as? List<String> ?: listOf()
+                        sports = (document.get("sports") as? List<String>)?.toMutableList() ?: mutableListOf()
                         userGender = document.getString("gender") ?: ""
                         userCity = document.getString("city") ?: ""
                         userAge = document.getString("age") ?: ""
@@ -106,12 +109,58 @@ fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
                         )
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        OutlinedTextField(
-                            value = sports.joinToString(", "),
-                            onValueChange = { sports = it.split(",").map { sport -> sport.trim() } },
-                            label = { Text("Sports pratiqués") },
+                        // Section pour ajouter ou modifier les sports
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
-                        )
+                        ) {
+                            OutlinedTextField(
+                                value = newSport,
+                                onValueChange = { newSport = it },
+                                label = { Text("Ajouter un sport") },
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    if (newSport.isNotBlank()) {
+                                        sports.add(newSport.trim())
+                                        newSport = ""
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF6200EE),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text("+")
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Liste des sports modifiables
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            sports.forEach { sport ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(text = sport, modifier = Modifier.weight(1f))
+                                    IconButton(
+                                        onClick = { sports.remove(sport) }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Supprimer le sport",
+                                            tint = Color.Red
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(16.dp))
 
                         Button(

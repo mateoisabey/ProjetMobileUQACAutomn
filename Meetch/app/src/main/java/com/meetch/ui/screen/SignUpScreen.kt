@@ -3,6 +3,9 @@ package com.meetch.ui.screen
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,7 +27,8 @@ fun SignUpScreen(authManager: FirebaseAuthManager, onSignUpSuccess: () -> Unit) 
     var age by remember { mutableStateOf("") }
     var gender by remember { mutableStateOf("") }
     var city by remember { mutableStateOf("") }
-    var sports by remember { mutableStateOf("") }
+    var newSport by remember { mutableStateOf("") }
+    var sports by remember { mutableStateOf(mutableListOf<String>()) }
     var message by remember { mutableStateOf("") }
 
     val db = FirebaseFirestore.getInstance()
@@ -48,107 +52,166 @@ fun SignUpScreen(authManager: FirebaseAuthManager, onSignUpSuccess: () -> Unit) 
             alignment = Alignment.Center
         )
 
+        // Champs pour les informations utilisateur
         TextField(value = email, onValueChange = { email = it }, label = { Text("Email", color = Color.White) },
-            textStyle = LocalTextStyle.current.copy(color = Color.White), // Couleur du texte saisi
-            colors = TextFieldDefaults.textFieldColors(
-                focusedIndicatorColor = Color(0xFFFF6F00),  // Couleur de la ligne sous le champ lorsqu'il est focalisé
-                unfocusedIndicatorColor = Color.Gray,       // Couleur de la ligne sous le champ lorsqu'il n'est pas focalisé
-                cursorColor = Color.White,                  // Couleur du curseur
-                containerColor = Color(0xFF1C2833)          // Couleur de fond du TextField
-            ),
-            modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        TextField(value = password, onValueChange = { password = it }, label = { Text("Password", color = Color.White) },
-            visualTransformation = PasswordVisualTransformation(),
-            textStyle = LocalTextStyle.current.copy(color = Color.White), // Couleur du texte saisi
-            colors = TextFieldDefaults.textFieldColors(
-                focusedIndicatorColor = Color(0xFFFF6F00),  // Couleur de la ligne sous le champ lorsqu'il est focalisé
-                unfocusedIndicatorColor = Color.Gray,       // Couleur de la ligne sous le champ lorsqu'il n'est pas focalisé
-                cursorColor = Color.White,                  // Couleur du curseur
-                containerColor = Color(0xFF1C2833)          // Couleur de fond du TextField
-            ),
-            modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        TextField(value = name, onValueChange = { name = it }, label = { Text("Nom", color = Color.White) },
-            textStyle = LocalTextStyle.current.copy(color = Color.White), // Couleur du texte saisi
-            colors = TextFieldDefaults.textFieldColors(
-                focusedIndicatorColor = Color(0xFFFF6F00),  // Couleur de la ligne sous le champ lorsqu'il est focalisé
-                unfocusedIndicatorColor = Color.Gray,       // Couleur de la ligne sous le champ lorsqu'il n'est pas focalisé
-                cursorColor = Color.White,                  // Couleur du curseur
-                containerColor = Color(0xFF1C2833)          // Couleur de fond du TextField
-            ),
-            modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        TextField(value = age, onValueChange = { age = it }, label = { Text("Age", color = Color.White) },
-            textStyle = LocalTextStyle.current.copy(color = Color.White), // Couleur du texte saisi
-            colors = TextFieldDefaults.textFieldColors(
-                focusedIndicatorColor = Color(0xFFFF6F00),  // Couleur de la ligne sous le champ lorsqu'il est focalisé
-                unfocusedIndicatorColor = Color.Gray,       // Couleur de la ligne sous le champ lorsqu'il n'est pas focalisé
-                cursorColor = Color.White,                  // Couleur du curseur
-                containerColor = Color(0xFF1C2833)          // Couleur de fond du TextField
-            ),
-            modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        TextField(value = gender, onValueChange = { gender = it }, label = { Text("Sexe", color = Color.White) },
-            textStyle = LocalTextStyle.current.copy(color = Color.White), // Couleur du texte saisi
-            colors = TextFieldDefaults.textFieldColors(
-                focusedIndicatorColor = Color(0xFFFF6F00),  // Couleur de la ligne sous le champ lorsqu'il est focalisé
-                unfocusedIndicatorColor = Color.Gray,       // Couleur de la ligne sous le champ lorsqu'il n'est pas focalisé
-                cursorColor = Color.White,                  // Couleur du curseur
-                containerColor = Color(0xFF1C2833)          // Couleur de fond du TextField
-            ),
-            modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        TextField(value = city, onValueChange = { city = it }, label = { Text("Ville", color = Color.White) },
-            textStyle = LocalTextStyle.current.copy(color = Color.White), // Couleur du texte saisi
-            colors = TextFieldDefaults.textFieldColors(
-                focusedIndicatorColor = Color(0xFFFF6F00),  // Couleur de la ligne sous le champ lorsqu'il est focalisé
-                unfocusedIndicatorColor = Color.Gray,       // Couleur de la ligne sous le champ lorsqu'il n'est pas focalisé
-                cursorColor = Color.White,                  // Couleur du curseur
-                containerColor = Color(0xFF1C2833)          // Couleur de fond du TextField
-            ),
-            modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        TextField(value = sports, onValueChange = { sports = it }, label = { Text("Sports pratiqués (séparés par des virgules)", color = Color.White) },
             textStyle = LocalTextStyle.current.copy(color = Color.White),
             colors = TextFieldDefaults.textFieldColors(
                 focusedIndicatorColor = Color(0xFFFF6F00),
                 unfocusedIndicatorColor = Color.Gray,
                 cursorColor = Color.White,
-                containerColor = Color(0xFF1C2833)          // Couleur de fond du TextField
+                containerColor = Color(0xFF1C2833)
+            ),
+            modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(value = password, onValueChange = { password = it }, label = { Text("Password", color = Color.White) },
+            visualTransformation = PasswordVisualTransformation(),
+            textStyle = LocalTextStyle.current.copy(color = Color.White),
+            colors = TextFieldDefaults.textFieldColors(
+                focusedIndicatorColor = Color(0xFFFF6F00),
+                unfocusedIndicatorColor = Color.Gray,
+                cursorColor = Color.White,
+                containerColor = Color(0xFF1C2833)
+            ),
+            modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(value = name, onValueChange = { name = it }, label = { Text("Nom", color = Color.White) },
+            textStyle = LocalTextStyle.current.copy(color = Color.White),
+            colors = TextFieldDefaults.textFieldColors(
+                focusedIndicatorColor = Color(0xFFFF6F00),
+                unfocusedIndicatorColor = Color.Gray,
+                cursorColor = Color.White,
+                containerColor = Color(0xFF1C2833)
+            ),
+            modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(value = age, onValueChange = { age = it }, label = { Text("Age", color = Color.White) },
+            textStyle = LocalTextStyle.current.copy(color = Color.White),
+            colors = TextFieldDefaults.textFieldColors(
+                focusedIndicatorColor = Color(0xFFFF6F00),
+                unfocusedIndicatorColor = Color.Gray,
+                cursorColor = Color.White,
+                containerColor = Color(0xFF1C2833)
+            ),
+            modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(value = gender, onValueChange = { gender = it }, label = { Text("Sexe", color = Color.White) },
+            textStyle = LocalTextStyle.current.copy(color = Color.White),
+            colors = TextFieldDefaults.textFieldColors(
+                focusedIndicatorColor = Color(0xFFFF6F00),
+                unfocusedIndicatorColor = Color.Gray,
+                cursorColor = Color.White,
+                containerColor = Color(0xFF1C2833)
+            ),
+            modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(value = city, onValueChange = { city = it }, label = { Text("Ville", color = Color.White) },
+            textStyle = LocalTextStyle.current.copy(color = Color.White),
+            colors = TextFieldDefaults.textFieldColors(
+                focusedIndicatorColor = Color(0xFFFF6F00),
+                unfocusedIndicatorColor = Color.Gray,
+                cursorColor = Color.White,
+                containerColor = Color(0xFF1C2833)
             ),
             modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(16.dp))
-        Button(colors = ButtonDefaults.buttonColors(
-            containerColor = Color.Gray,   // Fond du bouton en blanc
-            contentColor = Color.White      // Texte en noir pour contraste
-        ),
-            onClick = {
-            authManager.signUpWithEmail(email, password) { success, user, errorMessage ->
-                if (success && user != null) {
-                    val userData = hashMapOf(
-                        "name" to name,
-                        "age" to age,
-                        "gender" to gender,
-                        "city" to city,
-                        "sports" to sports.split(",").map { it.trim() },
-                        "email" to email
-                    )
 
-                    db.collection("userData").document(user.uid)
-                        .set(userData)
-                        .addOnSuccessListener {
-                            message = "Utilisateur créé avec succès"
-                            onSignUpSuccess()
-                        }
-                        .addOnFailureListener { e ->
-                            message = "Erreur lors de l'enregistrement des données : ${e.message}"
-                        }
-                } else {
-                    message = "Échec de la création du compte : $errorMessage"
+        // Section pour ajouter des sports
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            TextField(
+                value = newSport,
+                onValueChange = { newSport = it },
+                label = { Text("Ajouter un sport", color = Color.White) },
+                textStyle = LocalTextStyle.current.copy(color = Color.White),
+                colors = TextFieldDefaults.textFieldColors(
+                    focusedIndicatorColor = Color(0xFFFF6F00),
+                    unfocusedIndicatorColor = Color.Gray,
+                    cursorColor = Color.White,
+                    containerColor = Color(0xFF1C2833)
+                ),
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
+                onClick = {
+                    if (newSport.isNotBlank()) {
+                        sports.add(newSport.trim())
+                        newSport = ""
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFFF6F00),
+                    contentColor = Color.White
+                )
+            ) {
+                Text("+")
+            }
+        }
+
+        // Liste des sports ajoutés avec option de suppression
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            sports.forEachIndexed { index, sport ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    Text(
+                        text = sport,
+                        color = Color.White,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { sports.removeAt(index) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Supprimer",
+                            tint = Color.Red
+                        )
+                    }
                 }
             }
-        }) {
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(colors = ButtonDefaults.buttonColors(
+            containerColor = Color.Gray,
+            contentColor = Color.White
+        ),
+            onClick = {
+                authManager.signUpWithEmail(email, password) { success, user, errorMessage ->
+                    if (success && user != null) {
+                        val userData = hashMapOf(
+                            "name" to name,
+                            "age" to age,
+                            "gender" to gender,
+                            "city" to city,
+                            "sports" to sports,
+                            "email" to email
+                        )
+
+                        db.collection("userData").document(user.uid)
+                            .set(userData)
+                            .addOnSuccessListener {
+                                message = "Utilisateur créé avec succès"
+                                onSignUpSuccess()
+                            }
+                            .addOnFailureListener { e ->
+                                message = "Erreur lors de l'enregistrement des données : ${e.message}"
+                            }
+                    } else {
+                        message = "Échec de la création du compte : $errorMessage"
+                    }
+                }
+            }) {
             Text("Créer un compte", color = Color.White)
         }
         Spacer(modifier = Modifier.height(8.dp))
