@@ -13,20 +13,25 @@ import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
+
 @Composable
 fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
+    // Champs pour les informations utilisateur
     var userName by remember { mutableStateOf("") }
     var userGender by remember { mutableStateOf("") }
     var userCity by remember { mutableStateOf("") }
     var userAge by remember { mutableStateOf("") }
     var newSport by remember { mutableStateOf("") }
     var sports by remember { mutableStateOf(mutableListOf<String>()) }
+
+    // États pour le chargement et l'édition
     var loading by remember { mutableStateOf(true) }
     var isEditing by remember { mutableStateOf(false) }
 
     val db = FirebaseFirestore.getInstance()
     val currentUser = FirebaseAuth.getInstance().currentUser
 
+    // Charger les données utilisateur à partir de Firebase Firestore
     LaunchedEffect(Unit) {
         currentUser?.let { user ->
             db.collection("userData").document(user.uid).get()
@@ -47,6 +52,7 @@ fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
     }
 
     if (loading) {
+        // Indicateur de chargement pendant le téléchargement des données utilisateur
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -77,6 +83,7 @@ fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (isEditing) {
+                        // Formulaire d'édition
                         OutlinedTextField(
                             value = userName,
                             onValueChange = { userName = it },
@@ -88,7 +95,7 @@ fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
                         OutlinedTextField(
                             value = userAge,
                             onValueChange = { userAge = it },
-                            label = { Text("Age") },
+                            label = { Text("Âge") },
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -109,7 +116,7 @@ fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
                         )
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Section pour ajouter ou modifier les sports
+                        // Ajout de nouveaux sports
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
@@ -139,7 +146,7 @@ fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Liste des sports modifiables
+                        // Liste des sports avec option de suppression
                         Column(modifier = Modifier.fillMaxWidth()) {
                             sports.forEach { sport ->
                                 Row(
@@ -163,6 +170,7 @@ fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        // Bouton pour enregistrer les modifications
                         Button(
                             onClick = {
                                 currentUser?.let { user ->
@@ -177,9 +185,6 @@ fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
                                         .addOnSuccessListener {
                                             isEditing = false
                                         }
-                                        .addOnFailureListener {
-                                            // Gérer l'erreur ici si besoin
-                                        }
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EE)),
@@ -190,6 +195,7 @@ fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
                             Text(text = "Enregistrer", color = Color.White)
                         }
                     } else {
+                        // Affichage des informations utilisateur
                         Text(text = "Nom : $userName", style = MaterialTheme.typography.bodyLarge)
                         Spacer(modifier = Modifier.height(8.dp))
 
@@ -203,7 +209,7 @@ fun ProfileScreen(onEditProfile: () -> Unit, onLogout: () -> Unit) {
                         }
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        Text(text = "Age : $userAge", style = MaterialTheme.typography.bodyLarge)
+                        Text(text = "Âge : $userAge", style = MaterialTheme.typography.bodyLarge)
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(text = "Sexe : $userGender", style = MaterialTheme.typography.bodyLarge)

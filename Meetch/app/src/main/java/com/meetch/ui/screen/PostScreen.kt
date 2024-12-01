@@ -16,10 +16,14 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.*
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
+fun PostScreen(onActivityCreated: (ActivityData) -> Unit, onCancel: () -> Unit) {
+    // Gestion des étapes du formulaire
     var currentStep by remember { mutableStateOf(0) }
+
+    // Champs de saisie pour les informations de l'activité
     val activityName = remember { mutableStateOf(TextFieldValue("")) }
     val activityDate = remember { mutableStateOf("") }
     val activityLocation = remember { mutableStateOf("") }
@@ -27,14 +31,13 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
 
     val db = FirebaseFirestore.getInstance()
     val currentUser = FirebaseAuth.getInstance().currentUser
-
     val context = LocalContext.current
 
-    // Liste des options pour le lieu
+    // Options pour le menu déroulant des lieux
     val locationOptions = listOf("Stade", "Salle de gym", "Piscine", "Parc")
     var isDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Function to show the DatePicker dialog
+    // Affichage du sélecteur de date
     fun showDatePickerDialog() {
         val calendar = Calendar.getInstance()
         DatePickerDialog(
@@ -50,6 +53,7 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         if (currentStep < 4) {
+            // Formulaire pas à pas
             Card(
                 modifier = Modifier
                     .fillMaxWidth(0.75f)
@@ -61,8 +65,9 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
                         .fillMaxSize()
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
+                    // Titre indiquant l'étape actuelle
                     Text(
                         text = when (currentStep) {
                             0 -> "Nom de l'activité"
@@ -76,6 +81,7 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Champs de saisie selon l'étape
                     when (currentStep) {
                         0 -> {
                             OutlinedTextField(
@@ -93,7 +99,6 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
                             }
                         }
                         2 -> {
-                            // Utilisation d'un menu déroulant pour le lieu
                             ExposedDropdownMenuBox(
                                 expanded = isDropdownExpanded,
                                 onExpandedChange = { isDropdownExpanded = !isDropdownExpanded }
@@ -138,54 +143,97 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit) {
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    IconButton(
-                        onClick = {
-                            if (when (currentStep) {
-                                    0 -> activityName.value.text.isNotEmpty()
-                                    1 -> activityDate.value.isNotEmpty()
-                                    2 -> activityLocation.value.isNotEmpty()
-                                    3 -> activityDescription.value.text.isNotEmpty()
-                                    else -> false
-                                }) {
-                                currentStep++
+
+                    // Boutons "Retour" et "Suivant/Annuler"
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        if (currentStep > 0) {
+                            Button(onClick = { currentStep-- }) {
+                                Text("Retour")
+                            }
+                        } else {
+                            Button(onClick = { onCancel() }) {
+                                Text("Annuler")
                             }
                         }
-                    ) {
-                        Icon(imageVector = Icons.Default.ArrowForward, contentDescription = "Suivant")
+
+                        IconButton(
+                            onClick = {
+                                if (when (currentStep) {
+                                        0 -> activityName.value.text.isNotEmpty()
+                                        1 -> activityDate.value.isNotEmpty()
+                                        2 -> activityLocation.value.isNotEmpty()
+                                        3 -> activityDescription.value.text.isNotEmpty()
+                                        else -> false
+                                    }) {
+                                    currentStep++
+                                }
+                            }
+                        ) {
+                            Icon(imageVector = Icons.Default.ArrowForward, contentDescription = "Suivant")
+                        }
                     }
                 }
             }
         } else {
-            Button(onClick = {
-                if (currentUser != null) {
-                    val activity = hashMapOf(
-                        "userId" to currentUser.uid,
-                        "name" to activityName.value.text,
-                        "date" to activityDate.value,
-                        "location" to activityLocation.value,
-                        "description" to activityDescription.value.text,
-                    )
-                    db.collection("activities").add(activity)
-                        .addOnSuccessListener {
-                            onActivityCreated(
-                                ActivityData(
-                                    name = activityName.value.text,
-                                    date = activityDate.value,
-                                    location = activityLocation.value,
-                                    description = activityDescription.value.text
-                                )
+            // Résumé des informations saisies
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Résumé de l'activité",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Nom : ${activityName.value.text}")
+                Text("Date : ${activityDate.value}")
+                Text("Lieu : ${activityLocation.value}")
+                Text("Description : ${activityDescription.value.text}")
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Boutons "Modifier" et "Enregistrer"
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(onClick = { currentStep-- }) {
+                        Text("Modifier")
+                    }
+                    Button(onClick = {
+                        if (currentUser != null) {
+                            val activity = hashMapOf(
+                                "userId" to currentUser.uid,
+                                "name" to activityName.value.text,
+                                "date" to activityDate.value,
+                                "location" to activityLocation.value,
+                                "description" to activityDescription.value.text,
                             )
+                            db.collection("activities").add(activity)
+                                .addOnSuccessListener {
+                                    onActivityCreated(
+                                        ActivityData(
+                                            name = activityName.value.text,
+                                            date = activityDate.value,
+                                            location = activityLocation.value,
+                                            description = activityDescription.value.text
+                                        )
+                                    )
+                                }
+                                .addOnFailureListener {
+                                    // Gérer l'échec de l'enregistrement
+                                }
                         }
-                        .addOnFailureListener {
-                            // Gérer l'échec de l'enregistrement
-                        }
+                    }) {
+                        Text("Enregistrer")
+                    }
                 }
-            }) {
-                Text("Enregistrer l'activité")
             }
         }
     }
 }
+
 
 data class ActivityData(
     val name: String,

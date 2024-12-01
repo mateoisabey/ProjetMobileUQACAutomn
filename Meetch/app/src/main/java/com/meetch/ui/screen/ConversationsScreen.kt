@@ -4,9 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.google.firebase.auth.FirebaseAuth
@@ -17,15 +21,20 @@ fun ConversationsScreen(navController: NavHostController) {
     val db = FirebaseFirestore.getInstance()
     val currentUser = FirebaseAuth.getInstance().currentUser
 
-    // Sections distinctes : requêtes de messages et conversations existantes
+    // Liste des requêtes de messages
     var messageRequests by remember { mutableStateOf(listOf<Triple<String, String, String>>()) }
-    var existingConversations by remember { mutableStateOf(listOf<Triple<String, String, String>>()) }
-    var unreadConversations by remember { mutableStateOf(setOf<String>()) } // Conserve les IDs des conversations avec des messages non lus
 
-    // Charger les requêtes de messages en temps réel
+    // Liste des conversations existantes
+    var existingConversations by remember { mutableStateOf(listOf<Triple<String, String, String>>()) }
+
+    // Ensemble des conversations avec des messages non lus
+    var unreadConversations by remember { mutableStateOf(setOf<String>()) }
+
+    val scrollState = rememberScrollState()
+
     LaunchedEffect(Unit) {
         currentUser?.let { user ->
-            // Listener pour les requêtes de messages
+            // Écouteur pour les requêtes de messages
             db.collection("messageRequests")
                 .whereEqualTo("toUserId", user.uid)
                 .addSnapshotListener { snapshot, e ->
@@ -34,12 +43,14 @@ fun ConversationsScreen(navController: NavHostController) {
                         return@addSnapshotListener
                     }
 
-                    val requestsList = mutableListOf<Triple<String, String, String>>()
+                    val requestsList = mutableListOf<Pair<Long, Triple<String, String, String>>>()
                     snapshot?.documents?.forEach { document ->
                         val fromUserId = document.getString("fromUserId") ?: ""
                         val activityId = document.getString("activityId") ?: ""
                         val messageRequestId = document.id
+                        val timestamp = document.getLong("timestamp") ?: 0L
 
+                        // Charger les informations de l'utilisateur et de l'activité
                         db.collection("userData").document(fromUserId)
                             .get()
                             .addOnSuccessListener { userDoc ->
@@ -49,9 +60,13 @@ fun ConversationsScreen(navController: NavHostController) {
                                     .addOnSuccessListener { activityDoc ->
                                         val activityName = activityDoc.getString("name") ?: "Activité inconnue"
                                         requestsList.add(
-                                            Triple("$userName pour l'activité $activityName", messageRequestId, fromUserId)
+                                            timestamp to Triple(
+                                                "$userName pour l'activité $activityName",
+                                                messageRequestId,
+                                                fromUserId
+                                            )
                                         )
-                                        messageRequests = requestsList.toList()
+                                        messageRequests = requestsList.sortedByDescending { it.first }.map { it.second }
                                     }
                                     .addOnFailureListener { exception ->
                                         println("Erreur lors de la récupération de l'activité : ${exception.message}")
@@ -63,7 +78,7 @@ fun ConversationsScreen(navController: NavHostController) {
                     }
                 }
 
-            // Listener pour les conversations existantes
+            // Écouteur pour les conversations existantes
             db.collection("conversations")
                 .whereArrayContains("participants", user.uid)
                 .addSnapshotListener { snapshot, e ->
@@ -72,27 +87,35 @@ fun ConversationsScreen(navController: NavHostController) {
                         return@addSnapshotListener
                     }
 
-                    val conversationsList = mutableListOf<Triple<String, String, String>>()
+                    val conversationsList = mutableListOf<Pair<Long, Triple<String, String, String>>>()
                     val unreadList = mutableSetOf<String>()
 
                     snapshot?.documents?.forEach { document ->
                         val conversationId = document.id
                         val fromUserId = document.getString("fromUserId") ?: ""
                         val toUserId = document.getString("toUserId") ?: ""
-
-                        // Déterminer si la conversation a des messages non lus
-                        val lastReadTimestamp = document.getLong("lastReadTimestamp_${user.uid}") ?: 0L
                         val lastMessageTimestamp = document.getLong("lastMessageTimestamp") ?: 0L
+                        val nomActivite = document.getString("nomActivite") ?: "Activité inconnue"
+
+                        // Vérifier si la conversation a des messages non lus
+                        val lastReadTimestamp = document.getLong("lastReadTimestamp_${user.uid}") ?: 0L
                         if (lastMessageTimestamp > lastReadTimestamp) {
                             unreadList.add(conversationId)
                         }
 
+                        // Charger le nom de l'utilisateur et l'ajouter à la liste
                         db.collection("userData").document(if (fromUserId == user.uid) toUserId else fromUserId)
                             .get()
                             .addOnSuccessListener { userDoc ->
-                                val otherUserName = userDoc.getString("name") ?: "Utilisateur"
-                                conversationsList.add(Triple(otherUserName, conversationId, fromUserId))
-                                existingConversations = conversationsList.toList()
+                                conversationsList.add(
+                                    lastMessageTimestamp to Triple(
+                                        nomActivite,
+                                        conversationId,
+                                        fromUserId
+                                    )
+                                )
+                                existingConversations =
+                                    conversationsList.sortedByDescending { it.first }.map { it.second }
                             }
                             .addOnFailureListener { exception ->
                                 println("Erreur lors de la récupération des informations de l'utilisateur : ${exception.message}")
@@ -103,22 +126,29 @@ fun ConversationsScreen(navController: NavHostController) {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Mes Conversations", style = MaterialTheme.typography.titleSmall)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(scrollState)
+    ) {
+        // Titre principal
+        Text("Mes Conversations", style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Section pour les requêtes de messages
+        // Section des requêtes de messages
         Text("Requêtes de Messages", style = MaterialTheme.typography.bodyLarge)
-        LazyColumn {
+        LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
             items(messageRequests.size) { index ->
                 val (requestTitle, messageRequestId, fromUserId) = messageRequests[index]
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp)
+                        .padding(vertical = 4.dp)
                         .clickable {
                             navController.navigate("conversationDetail/$requestTitle/$messageRequestId/$fromUserId")
-                        }
+                        },
+                    elevation = CardDefaults.cardElevation(4.dp)
                 ) {
                     Row(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -127,13 +157,19 @@ fun ConversationsScreen(navController: NavHostController) {
                             style = MaterialTheme.typography.bodyLarge
                         )
                         Button(onClick = {
-                            // Accepter la requête : déplacer vers "conversations"
                             db.collection("conversations").document(messageRequestId)
-                                .set(mapOf("fromUserId" to fromUserId, "toUserId" to currentUser?.uid, "participants" to listOf(fromUserId, currentUser?.uid)))
+                                .set(
+                                    mapOf(
+                                        "fromUserId" to fromUserId,
+                                        "toUserId" to currentUser?.uid,
+                                        "nomActivite" to requestTitle.split(" - ").last(),
+                                        "participants" to listOf(fromUserId, currentUser?.uid),
+                                        "lastMessageTimestamp" to System.currentTimeMillis()
+                                    )
+                                )
                                 .addOnSuccessListener {
                                     db.collection("messageRequests").document(messageRequestId).delete()
                                         .addOnSuccessListener {
-                                            // Mettre à jour les listes
                                             messageRequests = messageRequests.filterNot { it.second == messageRequestId }
                                         }
                                         .addOnFailureListener { exception ->
@@ -153,28 +189,37 @@ fun ConversationsScreen(navController: NavHostController) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Section pour les conversations existantes
+        // Section des conversations existantes
         Text("Conversations", style = MaterialTheme.typography.bodyLarge)
-        LazyColumn {
+        LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
             items(existingConversations.size) { index ->
                 val (conversationTitle, conversationId, fromUserId) = existingConversations[index]
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp)
-                        .background(if (unreadConversations.contains(conversationId)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
-                        .clickable {
-                            navController.navigate("conversationDetail/$conversationTitle/$conversationId/$fromUserId")
-                            // Marquer la conversation comme lue
-                            db.collection("conversations").document(conversationId)
-                                .update("lastReadTimestamp_${currentUser?.uid}", System.currentTimeMillis())
+                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                navController.navigate("conversationDetail/$conversationTitle/$conversationId/$fromUserId")
+                                db.collection("conversations").document(conversationId)
+                                    .update("lastReadTimestamp_${currentUser?.uid}", System.currentTimeMillis())
+                            },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (unreadConversations.contains(conversationId)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .background(Color.Red)
+                                    .padding(end = 8.dp)
+                            )
                         }
-                ) {
-                    Text(
-                        text = conversationTitle,
-                        modifier = Modifier.padding(16.dp),
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                        Text(
+                            text = conversationTitle,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                    Divider(modifier = Modifier.padding(top = 4.dp))
                 }
             }
         }

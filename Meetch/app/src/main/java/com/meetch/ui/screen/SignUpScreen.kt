@@ -74,7 +74,7 @@ fun SignUpScreen(authManager: FirebaseAuthManager, onSignUpSuccess: () -> Unit) 
             ),
             modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(8.dp))
-        TextField(value = name, onValueChange = { name = it }, label = { Text("Nom", color = Color.White) },
+        TextField(value = name, onValueChange = { name = it }, label = { Text("Pseudo", color = Color.White) },
             textStyle = LocalTextStyle.current.copy(color = Color.White),
             colors = TextFieldDefaults.textFieldColors(
                 focusedIndicatorColor = Color(0xFFFF6F00),

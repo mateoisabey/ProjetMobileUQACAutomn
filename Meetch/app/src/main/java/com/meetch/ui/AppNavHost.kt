@@ -63,10 +63,15 @@ fun AppNavHost(authManager: FirebaseAuthManager) {
                 ConversationDetailScreen(navController, conversationTitle, messageRequestId, fromUserId)
             }
             composable("post") {
-                PostScreen { activityData ->
-                    println("Activité créée : $activityData")
-                    navController.popBackStack()
-                }
+                PostScreen(
+                    onActivityCreated = { activityData ->
+                        println("Activité créée : $activityData")
+                        navController.popBackStack()
+                    },
+                    onCancel = {
+                        navController.popBackStack()
+                    }
+                )
             }
             composable("profile") {
                 ProfileScreen(
