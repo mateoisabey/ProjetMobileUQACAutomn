@@ -61,7 +61,7 @@ fun ConversationsScreen(navController: NavHostController) {
                                         val activityName = activityDoc.getString("name") ?: "Activité inconnue"
                                         requestsList.add(
                                             timestamp to Triple(
-                                                "$userName pour l'activité $activityName",
+                                                "$userName pour l'activité ${activityName.split(" ").drop(1).joinToString(" ")}",
                                                 messageRequestId,
                                                 fromUserId
                                             )
@@ -103,13 +103,16 @@ fun ConversationsScreen(navController: NavHostController) {
                             unreadList.add(conversationId)
                         }
 
-                        // Charger le nom de l'utilisateur et l'ajouter à la liste
-                        db.collection("userData").document(if (fromUserId == user.uid) toUserId else fromUserId)
+                        // Identifier l'autre utilisateur pour la conversation
+                        val otherUserId = if (fromUserId == user.uid) toUserId else fromUserId
+
+                        db.collection("userData").document(otherUserId)
                             .get()
                             .addOnSuccessListener { userDoc ->
+                                val otherUserName = userDoc.getString("name") ?: "Utilisateur inconnu"
                                 conversationsList.add(
                                     lastMessageTimestamp to Triple(
-                                        nomActivite,
+                                        "$otherUserName pour l'activité ${nomActivite.split(" ").drop(1).joinToString(" ")}",
                                         conversationId,
                                         fromUserId
                                     )
@@ -162,7 +165,7 @@ fun ConversationsScreen(navController: NavHostController) {
                                     mapOf(
                                         "fromUserId" to fromUserId,
                                         "toUserId" to currentUser?.uid,
-                                        "nomActivite" to requestTitle.split(" - ").last(),
+                                        "nomActivite" to requestTitle.split(" ").drop(1).joinToString(" "),
                                         "participants" to listOf(fromUserId, currentUser?.uid),
                                         "lastMessageTimestamp" to System.currentTimeMillis()
                                     )

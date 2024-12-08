@@ -42,7 +42,6 @@ fun ConversationDetailScreen(
      * Chargement des messages en temps réel depuis Firestore.
      */
     LaunchedEffect(Unit) {
-        // Charger les messages associés à la conversation.
         db.collection("conversations").document(messageRequestId).collection("messages")
             .orderBy("timestamp")
             .addSnapshotListener { snapshot, e ->
@@ -78,11 +77,10 @@ fun ConversationDetailScreen(
                 println("Erreur lors de la vérification de l'acceptation de la conversation : ${exception.message}")
             }
     }
-
     /**
-     * Charge les informations de profil d'un utilisateur à partir de Firestore.
+     * Récupère les données de l'utilisateur spécifié.
      */
-    fun loadUserInfo(userId: String) {
+    fun fetchUserInfo(userId: String) {
         db.collection("userData").document(userId)
             .get()
             .addOnSuccessListener { document ->
@@ -102,6 +100,26 @@ fun ConversationDetailScreen(
             }
     }
 
+
+    /**
+     * Charge les informations de profil d'un utilisateur à partir de Firestore.
+     */
+    fun loadUserInfo() {
+       if (currentUser?.uid == fromUserId) {
+            // Si l'utilisateur actuel est le `fromUserId`, alors charger le `toUserId`.
+            db.collection("conversations").document(messageRequestId)
+                .get()
+                .addOnSuccessListener { document ->
+                    val toUserId = document.getString("toUserId") ?: ""
+                    fetchUserInfo(toUserId)
+                }
+        } else {
+            fetchUserInfo(fromUserId)
+        }
+    }
+
+
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -109,7 +127,7 @@ fun ConversationDetailScreen(
                     Text(
                         text = conversationTitle,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable { loadUserInfo(fromUserId) },
+                        modifier = Modifier.clickable { loadUserInfo() },
                         style = MaterialTheme.typography.titleLarge.copy(textDecoration = TextDecoration.Underline)
                     )
                 },
@@ -127,7 +145,7 @@ fun ConversationDetailScreen(
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            // Liste des messages dans la conversation
+            // Liste des messages
             LazyColumn(
                 modifier = Modifier.weight(1f)
             ) {
@@ -145,7 +163,7 @@ fun ConversationDetailScreen(
                             ),
                             modifier = Modifier
                                 .widthIn(max = 250.dp)
-                                .clickable { if (!isCurrentUser) loadUserInfo(senderId) }
+                                .clickable { if (!isCurrentUser) fetchUserInfo(senderId) }
                         ) {
                             Text(
                                 text = messageText,
@@ -158,7 +176,7 @@ fun ConversationDetailScreen(
                 }
             }
 
-            // Section pour envoyer un message si la conversation est acceptée
+            // Section pour envoyer un message
             if (isConversationAccepted) {
                 Row(
                     modifier = Modifier
@@ -197,61 +215,11 @@ fun ConversationDetailScreen(
                         Icon(imageVector = Icons.Default.Send, contentDescription = "Envoyer")
                     }
                 }
-            } else if (isRequestReceiver) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    // Bouton pour refuser une requête
-                    IconButton(onClick = {
-                        db.collection("messageRequests").document(messageRequestId)
-                            .delete()
-                            .addOnSuccessListener {
-                                println("Requête refusée et supprimée.")
-                                navController.popBackStack()
-                            }
-                            .addOnFailureListener { exception ->
-                                println("Erreur lors de la suppression de la requête : ${exception.message}")
-                            }
-                    }) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Refuser", tint = Color.Red)
-                    }
-                    // Bouton pour accepter une requête
-                    IconButton(onClick = {
-                        db.collection("conversations").document(messageRequestId)
-                            .set(
-                                mapOf(
-                                    "fromUserId" to fromUserId,
-                                    "toUserId" to currentUser?.uid,
-                                    "participants" to listOf(fromUserId, currentUser?.uid),
-                                    "lastMessageTimestamp" to System.currentTimeMillis()
-                                )
-                            )
-                            .addOnSuccessListener {
-                                db.collection("messageRequests").document(messageRequestId)
-                                    .delete()
-                                    .addOnSuccessListener {
-                                        println("Requête acceptée, conversation créée et requête supprimée.")
-                                        isConversationAccepted = true
-                                    }
-                                    .addOnFailureListener { exception ->
-                                        println("Erreur lors de la suppression de la requête : ${exception.message}")
-                                    }
-                            }
-                            .addOnFailureListener { exception ->
-                                println("Erreur lors de la création de la conversation : ${exception.message}")
-                            }
-                    }) {
-                        Icon(imageVector = Icons.Default.Check, contentDescription = "Accepter", tint = Color.Green)
-                    }
-                }
             }
         }
     }
 
-    // Boîte de dialogue pour afficher les informations de profil
+    // Boîte de dialogue des informations de profil
     if (isProfileDialogOpen) {
         AlertDialog(
             onDismissRequest = { isProfileDialogOpen = false },
