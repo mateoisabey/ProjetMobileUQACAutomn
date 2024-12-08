@@ -17,13 +17,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import coil.compose.rememberImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.launch
 import com.meetch.R
+import kotlinx.coroutines.launch
+
 @SuppressLint("UnrememberedMutableState")
 @Composable
 fun SwipeScreen() {
@@ -38,6 +40,7 @@ fun SwipeScreen() {
     var dates by remember { mutableStateOf(listOf<String>()) }
     var descriptions by remember { mutableStateOf(listOf<String>()) }
     var locations by remember { mutableStateOf(listOf<String>()) }
+    var imageUris by remember { mutableStateOf(listOf<String>()) }
 
     var currentIndex by remember { mutableStateOf(0) }
     var offsetX by remember { mutableStateOf(0f) }
@@ -63,6 +66,7 @@ fun SwipeScreen() {
                     dates = filteredActivities.map { it.getString("date") ?: "" }
                     descriptions = filteredActivities.map { it.getString("description") ?: "" }
                     locations = filteredActivities.map { it.getString("location") ?: "" }
+                    imageUris = filteredActivities.map { it.getString("imageUri") ?: "" }
 
                     // Réinitialiser l'index si nécessaire
                     currentIndex = 0
@@ -174,6 +178,7 @@ fun SwipeScreen() {
                 val activityDate = dates[currentIndex]
                 val activityDescription = descriptions[currentIndex]
                 val activityLocation = locations[currentIndex]
+                val activityImageUri = imageUris[currentIndex]
 
                 Card(
                     modifier = Modifier
@@ -207,6 +212,28 @@ fun SwipeScreen() {
                             .padding(16.dp),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
+                        // Image de l'activité
+                        if (activityImageUri.isNotEmpty()) {
+                            Image(
+                                painter = rememberImagePainter(activityImageUri),
+                                contentDescription = "Image de l'activité",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(150.dp),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Image(
+                                painter = painterResource(id = R.drawable.logo),
+                                contentDescription = "Image par défaut",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(150.dp),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+
+                        // Informations de l'activité
                         Text(
                             text = activityName,
                             style = MaterialTheme.typography.headlineSmall,

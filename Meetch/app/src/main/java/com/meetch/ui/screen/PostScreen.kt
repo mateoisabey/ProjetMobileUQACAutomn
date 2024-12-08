@@ -1,6 +1,10 @@
 package com.meetch.ui.screen
 
 import android.app.DatePickerDialog
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
@@ -12,32 +16,33 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import coil.compose.rememberImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.*
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostScreen(onActivityCreated: (ActivityData) -> Unit, onCancel: () -> Unit) {
-    // Gestion des étapes du formulaire
     var currentStep by remember { mutableStateOf(0) }
 
-    // Champs de saisie pour les informations de l'activité
     val activityName = remember { mutableStateOf(TextFieldValue("")) }
     val activityDate = remember { mutableStateOf("") }
     val activityLocation = remember { mutableStateOf("") }
     val activityDescription = remember { mutableStateOf(TextFieldValue("")) }
+    val selectedImageUri = remember { mutableStateOf<Uri?>(null) }
 
     val db = FirebaseFirestore.getInstance()
     val currentUser = FirebaseAuth.getInstance().currentUser
     val context = LocalContext.current
 
-    // Options pour le menu déroulant des lieux
     val locationOptions = listOf("Stade", "Salle de gym", "Piscine", "Parc")
     var isDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Affichage du sélecteur de date
+    val pickImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        selectedImageUri.value = uri
+    }
+
     fun showDatePickerDialog() {
         val calendar = Calendar.getInstance()
         DatePickerDialog(
@@ -52,8 +57,7 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit, onCancel: () -> Unit) 
     }
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        if (currentStep < 4) {
-            // Formulaire pas à pas
+        if (currentStep < 5) { // Augmenté à 5 pour inclure l'étape de l'image
             Card(
                 modifier = Modifier
                     .fillMaxWidth(0.75f)
@@ -67,13 +71,13 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit, onCancel: () -> Unit) 
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Titre indiquant l'étape actuelle
                     Text(
                         text = when (currentStep) {
                             0 -> "Nom de l'activité"
                             1 -> "Date de l'activité (JJ/MM/AAAA)"
                             2 -> "Lieu de l'activité"
                             3 -> "Description de l'activité"
+                            4 -> "Ajouter une image (facultatif)"
                             else -> ""
                         },
                         style = MaterialTheme.typography.titleSmall,
@@ -81,7 +85,6 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit, onCancel: () -> Unit) 
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Champs de saisie selon l'étape
                     when (currentStep) {
                         0 -> {
                             OutlinedTextField(
@@ -140,11 +143,31 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit, onCancel: () -> Unit) 
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
+                        4 -> {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Button(onClick = { pickImageLauncher.launch("image/*") }) {
+                                    Text("Choisir une image")
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                                selectedImageUri.value?.let {
+                                    Image(
+                                        painter = rememberImagePainter(it),
+                                        contentDescription = "Image sélectionnée",
+                                        modifier = Modifier.size(150.dp)
+                                    )
+                                }
+                                Text(
+                                    text = "Vous pouvez continuer sans image.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Boutons "Retour" et "Suivant/Annuler"
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -161,13 +184,12 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit, onCancel: () -> Unit) 
 
                         IconButton(
                             onClick = {
-                                if (when (currentStep) {
-                                        0 -> activityName.value.text.isNotEmpty()
-                                        1 -> activityDate.value.isNotEmpty()
-                                        2 -> activityLocation.value.isNotEmpty()
-                                        3 -> activityDescription.value.text.isNotEmpty()
-                                        else -> false
-                                    }) {
+                                if (currentStep < 4 || // Les étapes obligatoires
+                                    (currentStep == 4 && (activityName.value.text.isNotEmpty()
+                                            && activityDate.value.isNotEmpty()
+                                            && activityLocation.value.isNotEmpty()
+                                            && activityDescription.value.text.isNotEmpty()))
+                                ) {
                                     currentStep++
                                 }
                             }
@@ -178,7 +200,6 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit, onCancel: () -> Unit) 
                 }
             }
         } else {
-            // Résumé des informations saisies
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "Résumé de l'activité",
@@ -190,10 +211,16 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit, onCancel: () -> Unit) 
                 Text("Date : ${activityDate.value}")
                 Text("Lieu : ${activityLocation.value}")
                 Text("Description : ${activityDescription.value.text}")
+                selectedImageUri.value?.let {
+                    Image(
+                        painter = rememberImagePainter(it),
+                        contentDescription = "Image sélectionnée",
+                        modifier = Modifier.size(150.dp)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Boutons "Modifier" et "Enregistrer"
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
@@ -209,6 +236,7 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit, onCancel: () -> Unit) 
                                 "date" to activityDate.value,
                                 "location" to activityLocation.value,
                                 "description" to activityDescription.value.text,
+                                "imageUri" to selectedImageUri.value?.toString()
                             )
                             db.collection("activities").add(activity)
                                 .addOnSuccessListener {
@@ -217,7 +245,8 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit, onCancel: () -> Unit) 
                                             name = activityName.value.text,
                                             date = activityDate.value,
                                             location = activityLocation.value,
-                                            description = activityDescription.value.text
+                                            description = activityDescription.value.text,
+                                            imageUri = selectedImageUri.value?.toString()
                                         )
                                     )
                                 }
@@ -234,10 +263,10 @@ fun PostScreen(onActivityCreated: (ActivityData) -> Unit, onCancel: () -> Unit) 
     }
 }
 
-
 data class ActivityData(
     val name: String,
     val date: String,
     val location: String,
-    val description: String
+    val description: String,
+    val imageUri: String? = null
 )
